@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  
+  --color-max-lite: #3b82f6;
+  --color-max-pro: #8b5cf6;
+  --color-max-beast: #f97316;
+  --color-max-auto: #10b981;
+  
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prose styling for markdown */
+.prose-max {
+  color: inherit;
+  line-height: 1.7;
+}
+.prose-max p {
+  margin-bottom: 0.75em;
+}
+.prose-max p:last-child {
+  margin-bottom: 0;
+}
+.prose-max h1, .prose-max h2, .prose-max h3 {
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+.prose-max h1 { font-size: 1.5em; }
+.prose-max h2 { font-size: 1.25em; }
+.prose-max h3 { font-size: 1.1em; }
+.prose-max ul, .prose-max ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.prose-max ul { list-style-type: disc; }
+.prose-max ol { list-style-type: decimal; }
+.prose-max li { margin-bottom: 0.25em; }
+.prose-max code:not(pre code) {
+  background: rgba(0,0,0,0.07);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.dark .prose-max code:not(pre code) {
+  background: rgba(255,255,255,0.1);
+}
+.prose-max pre {
+  background: #1e1e2e;
+  border-radius: 12px;
+  padding: 1em 1.25em;
+  overflow-x: auto;
+  margin: 0.75em 0;
+  font-size: 0.88em;
+}
+.prose-max pre code {
+  color: #cdd6f4;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+}
+.prose-max blockquote {
+  border-left: 3px solid rgba(99,102,241,0.4);
+  padding-left: 1em;
+  opacity: 0.8;
+  margin: 0.75em 0;
+}
+.prose-max table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+}
+.prose-max th, .prose-max td {
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 0.4em 0.75em;
+  text-align: left;
+}
+.dark .prose-max th, .dark .prose-max td {
+  border-color: rgba(255,255,255,0.1);
+}
+.prose-max th {
+  background: rgba(0,0,0,0.04);
+  font-weight: 600;
+}
+.dark .prose-max th {
+  background: rgba(255,255,255,0.06);
+}
+.prose-max a {
+  color: #6366f1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.dark .glass {
+  background: rgba(30, 30, 40, 0.75);
+}
+
+/* Shimmer animation for loading */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Typing cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.typing-cursor::after {
+  content: '▋';
+  animation: blink 1s infinite;
+  margin-left: 1px;
+}
+
+/* Fade in up */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in-up {
+  animation: fadeInUp 0.3s ease forwards;
+}
+
+/* Scale in */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.scale-in {
+  animation: scaleIn 0.2s ease forwards;
+}

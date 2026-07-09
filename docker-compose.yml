@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: max-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-maxai}
+      POSTGRES_USER: ${POSTGRES_USER:-maxai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-maxai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - max-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: max-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-maxai}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-maxai}
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      PORT: 3001
+      # Azure API Keys
+      AZURE_ENDPOINT: ${AZURE_ENDPOINT}
+      AZURE_API_KEY: ${AZURE_API_KEY}
+      AZURE_API_VERSION: ${AZURE_API_VERSION:-2024-08-01-preview}
+      # Per-model overrides (optional, falls back to AZURE_*)
+      AZURE_ENDPOINT_LITE: ${AZURE_ENDPOINT_LITE:-}
+      AZURE_API_KEY_LITE: ${AZURE_API_KEY_LITE:-}
+      AZURE_DEPLOYMENT_LITE: ${AZURE_DEPLOYMENT_LITE:-gpt-4o-mini}
+      AZURE_ENDPOINT_PRO: ${AZURE_ENDPOINT_PRO:-}
+      AZURE_API_KEY_PRO: ${AZURE_API_KEY_PRO:-}
+      AZURE_DEPLOYMENT_PRO: ${AZURE_DEPLOYMENT_PRO:-gpt-4o}
+      AZURE_ENDPOINT_BEAST: ${AZURE_ENDPOINT_BEAST:-}
+      AZURE_API_KEY_BEAST: ${AZURE_API_KEY_BEAST:-}
+      AZURE_DEPLOYMENT_BEAST: ${AZURE_DEPLOYMENT_BEAST:-gpt-4o}
+    networks:
+      - max-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: max-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - max-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: max-nginx
+    restart: unless-stopped
+    ports:
+      - "${PORT:-80}:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - max-network
+
+volumes:
+  postgres_data:
+
+networks:
+  max-network:
+    driver: bridge
