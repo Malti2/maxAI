@@ -94,6 +94,22 @@ Durchgeführte Prüfungen:
 - **Frontend Build**: `npm run build` (`tsc -b && vite build`) läuft ohne Fehler durch.
 - **Frontend Lint**: `npm run lint` (oxlint) meldet 0 Fehler; die verbleibenden Warnungen sind vorbestehend und stammen nicht aus den geänderten Zeilen.
 - **Backend Build**: `npm run build` (`tsc`) kompiliert sauber, `dist/services/personalities.js` wird erzeugt.
+- **Logik-Test des Persönlichkeits-Service**: 17 Zusicherungen für `buildSystemPrompt`, `getPersonalityPrompt` und `isPersonalityId` – alle bestanden (u. a. Fallback auf `assistant` bei unbekannter ID, Schichtung der eigenen Anweisung, Ignorieren leerer Anweisungen, gemeinsamer Sicherheits-CORE in allen Prompts).
+- **Browser-Test (Playwright)**: Onboarding- und Einstellungsseite gerendert und per Screenshot geprüft (mit gemocktem Backend), hell und dunkel.
+
+### Screenshots
+
+Onboarding – Willkommen (neuer Schrittzähler „1 von 7“):
+
+![Onboarding Willkommen](./images/onboarding-welcome.png)
+
+Onboarding – neuer Schritt „Persönlichkeit“ (Casual ausgewählt):
+
+![Onboarding Persönlichkeit](./images/onboarding-personality.png)
+
+Einstellungen → „KI & Modelle“ mit Persönlichkeits-Wähler (Dark Mode, Professional ausgewählt):
+
+![Einstellungen Persönlichkeit](./images/settings-personality-dark.png)
 
 > ⚠️ Die Prisma-Client-Generierung ließ sich in der Sandbox nicht ausführen (Binär-Download war offline gesperrt, HTTP 403). Der endgültige typisierte Client wird im Docker-Build erzeugt, wo Netzwerkzugriff besteht. Die Schemaänderung folgt exakt dem bestehenden Muster.
 
