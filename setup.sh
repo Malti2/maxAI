@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# Max AI - Setup-Skript für Ubuntu VPS
+# maxAI - Setup-Skript für Ubuntu VPS
 # ============================================
 set -e
 
@@ -11,7 +11,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║        Max AI - Setup               ║${NC}"
+echo -e "${BLUE}║        maxAI - Setup                 ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
 echo ""
 
@@ -48,7 +48,7 @@ docker compose build
 echo -e "\n${BLUE}🚀 Container werden gestartet...${NC}"
 docker compose up -d
 
-echo -e "\n${GREEN}✅ Max AI läuft!${NC}"
+echo -e "\n${GREEN}✅ maxAI läuft!${NC}"
 echo -e "   Öffne http://$(hostname -I | awk '{print $1}') in deinem Browser"
 echo ""
 echo -e "Nützliche Befehle:"

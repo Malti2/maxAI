@@ -7,6 +7,7 @@ export interface User {
   name: string | null;
   onboardingDone: boolean;
   defaultModel: string;
+  personality: string;
   avatarColor: string;
   systemPrompt: string | null;
 }

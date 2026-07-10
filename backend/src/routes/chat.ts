@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { streamChat, selectAutoModel, ModelId } from '../services/azure';
+import { buildSystemPrompt } from '../services/personalities';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -146,10 +147,12 @@ router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest
 
     let fullContent = '';
 
+    const systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
+
     const result = await streamChat(
       selectedModel,
       history,
-      user?.systemPrompt || undefined,
+      systemPrompt,
       (chunk) => {
         fullContent += chunk;
         res.write(`data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`);

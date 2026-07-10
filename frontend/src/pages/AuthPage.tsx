@@ -60,7 +60,7 @@ export const AuthPage: React.FC = () => {
             <span className="text-white text-xl font-bold">M</span>
           </div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
-            Willkommen bei Max
+            Willkommen bei maxAI
           </h1>
           <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
             Dein persönlicher KI-Assistent

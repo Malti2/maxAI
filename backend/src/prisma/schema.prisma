@@ -17,6 +17,7 @@ model User {
   avatarColor     String    @default("#6366f1")
   onboardingDone  Boolean   @default(false)
   defaultModel    String    @default("auto")
+  personality     String    @default("assistant")
   systemPrompt    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

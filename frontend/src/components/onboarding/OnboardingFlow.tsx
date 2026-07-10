@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ArrowRight } from 'lucide-react';
 import { MODELS } from '../../lib/models';
+import { PERSONALITIES, DEFAULT_PERSONALITY, type PersonalityId } from '../../lib/personalities';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 
@@ -20,6 +21,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [name, setName] = useState(user?.name || '');
   const [selectedModel, setSelectedModel] = useState(user?.defaultModel || 'auto');
   const [selectedColor, setSelectedColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
+  const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || DEFAULT_PERSONALITY);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
@@ -27,6 +29,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const STEPS = [
     { id: 'welcome' },
     { id: 'name' },
+    { id: 'personality' },
     { id: 'color' },
     { id: 'model' },
     { id: 'system' },
@@ -34,6 +37,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   ] as const;
 
   const TOTAL = STEPS.length;
+  const stepId = STEPS[step].id;
   const progress = (step / (TOTAL - 1)) * 100;
 
   const next = () => { setDirection(1); setStep(s => Math.min(s + 1, TOTAL - 1)); };
@@ -45,6 +49,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       const { data } = await api.put('/settings', {
         name: name || undefined,
         defaultModel: selectedModel,
+        personality,
         avatarColor: selectedColor,
         systemPrompt: systemPrompt || null,
         onboardingDone: true,
@@ -56,7 +61,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     }
   };
 
-  const canProceed = step !== 1 || name.length >= 2;
+  const canProceed = stepId !== 'name' || name.length >= 2;
 
   const variants = {
     enter: (d: number) => ({ opacity: 0, x: d > 0 ? 28 : -28 }),
@@ -65,8 +70,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   };
 
   const renderContent = () => {
-    switch (step) {
-      case 0: // Welcome
+    switch (stepId) {
+      case 'welcome':
         return (
           <div className="text-center space-y-4">
             <div
@@ -77,7 +82,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             </div>
             <div>
               <h2 className="text-2xl font-semibold mb-2" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
-                Willkommen bei Max
+                Willkommen bei maxAI
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-2)' }}>
                 Dein persönlicher KI-Assistent mit mehreren Modellen –<br />
@@ -98,7 +103,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
-      case 1: // Name
+      case 'name':
         return (
           <div className="space-y-4 w-full">
             <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
@@ -123,7 +128,43 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
-      case 2: // Color
+      case 'personality':
+        return (
+          <div className="space-y-2 w-full">
+            <p className="text-sm text-center mb-3" style={{ color: 'var(--text-2)' }}>
+              Wie soll Max mit dir sprechen? <span style={{ color: 'var(--text-3)' }}>(Jederzeit änderbar)</span>
+            </p>
+            {PERSONALITIES.map(p => {
+              const Icon = p.icon;
+              const selected = personality === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPersonality(p.id)}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                  style={{
+                    borderColor: selected ? p.color + '70' : 'var(--border)',
+                    background: selected ? p.color + '0a' : 'var(--bg-3)',
+                  }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15`, color: p.color }}>
+                    <Icon size={17} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{p.name}</span>
+                      <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: `${p.color}18`, color: p.color }}>{p.tagline}</span>
+                    </div>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{p.description}</p>
+                  </div>
+                  {selected && <Check size={14} style={{ color: p.color }} className="shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        );
+
+      case 'color':
         return (
           <div className="flex flex-col items-center gap-5">
             <p className="text-sm" style={{ color: 'var(--text-2)' }}>Wähle eine Farbe für deinen Avatar.</p>
@@ -154,7 +195,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
-      case 3: // Model
+      case 'model':
         return (
           <div className="space-y-2 w-full">
             <p className="text-sm text-center mb-3" style={{ color: 'var(--text-2)' }}>
@@ -186,7 +227,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
-      case 4: // System prompt
+      case 'system':
         return (
           <div className="space-y-3 w-full">
             <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
@@ -213,7 +254,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
-      case 5: // Done
+      case 'done':
         return (
           <div className="text-center space-y-3">
             <div className="text-5xl">🎉</div>

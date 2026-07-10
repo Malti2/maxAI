@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { MODELS } from '../lib/models';
+import { PERSONALITIES, type PersonalityId } from '../lib/personalities';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useChatStore } from '../store/chatStore';
@@ -91,6 +92,7 @@ export const SettingsPage: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [color, setColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [model, setModel] = useState<ModelId>((user?.defaultModel as ModelId) || 'auto');
+  const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || 'assistant');
   const [sysPrompt, setSysPrompt] = useState<string>(user?.systemPrompt ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,6 +104,7 @@ export const SettingsPage: React.FC = () => {
       const { data } = await api.put('/settings', {
         name: name || undefined,
         defaultModel: model,
+        personality,
         avatarColor: color,
         systemPrompt: sysPrompt || null,
       });
@@ -218,6 +221,39 @@ export const SettingsPage: React.FC = () => {
         return (
           <div className="space-y-5">
             <div>
+              <FieldLabel label="Persönlichkeit" hint="Bestimmt Tonfall und Stil von Max" />
+              <div className="space-y-2 mt-2">
+                {PERSONALITIES.map(p => {
+                  const Icon = p.icon;
+                  const selected = personality === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPersonality(p.id)}
+                      className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                      style={{
+                        borderColor: selected ? p.color + '60' : 'var(--border)',
+                        background: selected ? p.color + '08' : 'var(--bg)',
+                      }}
+                    >
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15`, color: p.color }}>
+                        <Icon size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{p.name}</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: `${p.color}18`, color: p.color }}>{p.tagline}</span>
+                        </div>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{p.description}</p>
+                      </div>
+                      {selected && <Check size={14} style={{ color: p.color }} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
               <FieldLabel label="Standardmodell" hint="Wird für neue Chats verwendet" />
               <div className="space-y-2 mt-2">
                 {MODELS.map(m => (
@@ -247,7 +283,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Systemanweisung" hint="Globales Verhalten von Max für alle Chats" />
+              <FieldLabel label="Systemanweisung" hint="Zusätzliche Anweisung, die zur gewählten Persönlichkeit hinzukommt" />
               <textarea
                 value={sysPrompt}
                 onChange={e => setSysPrompt(e.target.value)}

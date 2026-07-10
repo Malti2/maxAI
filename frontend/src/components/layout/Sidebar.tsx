@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           >
             <span className="text-white text-[11px] font-bold">M</span>
           </div>
-          <span className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>Max</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>maxAI</span>
         </div>
         <button
           onClick={onNewChat}
