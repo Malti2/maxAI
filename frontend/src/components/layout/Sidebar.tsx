@@ -1,29 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, MessageSquare, Pin, Trash2, Settings, ChevronLeft,
-  Search, MoreHorizontal, PinOff
+  Plus, Pin, Trash2, Settings, ChevronLeft, Search,
+  MoreHorizontal, PinOff, MessageSquarePlus, Sparkles
 } from 'lucide-react';
-import { useChatStore, Conversation } from '../../store/chatStore';
+import { useChatStore, type Conversation } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { Avatar } from '../ui/Avatar';
 import { ModelBadge } from '../ui/ModelBadge';
-import { ModelId } from '../../lib/models';
+import type { ModelId } from '../../lib/models';
 import api from '../../lib/api';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isToday, isYesterday, subDays, isAfter } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 interface SidebarProps {
   onNewChat: () => void;
 }
 
+type DateGroup = 'today' | 'yesterday' | 'week' | 'month' | 'older';
+
+function getDateGroup(date: Date): DateGroup {
+  if (isToday(date)) return 'today';
+  if (isYesterday(date)) return 'yesterday';
+  if (isAfter(date, subDays(new Date(), 7))) return 'week';
+  if (isAfter(date, subDays(new Date(), 30))) return 'month';
+  return 'older';
+}
+
+const GROUP_LABELS: Record<DateGroup, string> = {
+  today: 'Heute',
+  yesterday: 'Gestern',
+  week: 'Letzte 7 Tage',
+  month: 'Letzter Monat',
+  older: 'Älter',
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
-  const { conversations, activeConversationId, setActiveConversation, removeConversation,
-    updateConversation, sidebarOpen, setSidebarOpen } = useChatStore();
+  const { conversations, activeConversationId, setActiveConversation,
+    removeConversation, updateConversation, sidebarOpen, setSidebarOpen } = useChatStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = () => setMenuId(null);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const filtered = conversations.filter(c =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -32,7 +57,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   const pinned = filtered.filter(c => c.pinned);
   const unpinned = filtered.filter(c => !c.pinned);
 
-  const selectConversation = (id: string) => {
+  // Group unpinned by date
+  const groups = (['today', 'yesterday', 'week', 'month', 'older'] as DateGroup[]).reduce(
+    (acc, g) => {
+      acc[g] = unpinned.filter(c => getDateGroup(new Date(c.updatedAt)) === g);
+      return acc;
+    },
+    {} as Record<DateGroup, Conversation[]>
+  );
+
+  const selectConv = (id: string) => {
     setActiveConversation(id);
     navigate(`/chat/${id}`);
   };
@@ -41,167 +75,222 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
     e.stopPropagation();
     await api.delete(`/chat/conversations/${id}`);
     removeConversation(id);
-    if (activeConversationId === id) {
-      navigate('/chat');
-    }
-    setMenuOpen(null);
+    if (activeConversationId === id) navigate('/chat');
+    setMenuId(null);
   };
 
   const handlePin = async (e: React.MouseEvent, conv: Conversation) => {
     e.stopPropagation();
     await api.post(`/chat/conversations/${conv.id}/pin`);
     updateConversation(conv.id, { pinned: !conv.pinned });
-    setMenuOpen(null);
+    setMenuId(null);
   };
 
-  const ConvItem = ({ conv }: { conv: Conversation }) => (
-    <div
-      key={conv.id}
-      onClick={() => selectConversation(conv.id)}
-      className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-        activeConversationId === conv.id
-          ? 'bg-black/8 dark:bg-white/8'
-          : 'hover:bg-black/4 dark:hover:bg-white/4'
-      }`}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          {conv.pinned && <Pin size={10} className="text-gray-400 shrink-0" />}
-          <p className="text-sm text-gray-700 dark:text-gray-200 truncate">{conv.title}</p>
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <ModelBadge modelId={conv.model as ModelId} size="xs" showName={false} />
-          <span className="text-[11px] text-gray-400">
-            {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true, locale: de })}
-          </span>
-        </div>
-      </div>
-
-      <div className="relative">
-        <button
-          onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === conv.id ? null : conv.id); }}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-all"
-        >
-          <MoreHorizontal size={14} className="text-gray-400" />
-        </button>
-
-        {menuOpen === conv.id && (
-          <div className="absolute right-0 top-6 z-50 w-44 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden scale-in">
-            <button
-              onClick={(e) => handlePin(e, conv)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              {conv.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-              {conv.pinned ? 'Lösen' : 'Anheften'}
-            </button>
-            <button
-              onClick={(e) => handleDelete(e, conv.id)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
-            >
-              <Trash2 size={14} /> Löschen
-            </button>
+  const ConvItem = ({ conv }: { conv: Conversation }) => {
+    const isActive = activeConversationId === conv.id;
+    return (
+      <div
+        onClick={() => selectConv(conv.id)}
+        className={`conv-item group ${isActive ? 'active' : ''}`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            {conv.pinned && <Pin size={9} style={{ color: 'var(--text-3)' }} className="shrink-0" />}
+            <p className="text-[13px] truncate" style={{ color: 'var(--text-1)', fontWeight: isActive ? 500 : 400 }}>
+              {conv.title}
+            </p>
           </div>
-        )}
-      </div>
-    </div>
-  );
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <ModelBadge modelId={conv.model as ModelId} size="xs" showName={false} />
+            <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>
+              {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true, locale: de })}
+            </span>
+          </div>
+        </div>
 
+        {/* Context menu button */}
+        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={e => { e.stopPropagation(); setMenuId(menuId === conv.id ? null : conv.id); }}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg transition-all"
+            style={{ color: 'var(--text-3)' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          >
+            <MoreHorizontal size={13} />
+          </button>
+
+          {menuId === conv.id && (
+            <div
+              className="absolute right-0 top-6 z-50 w-44 rounded-xl overflow-hidden animate-scale-in"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
+            >
+              <button
+                onClick={e => handlePin(e, conv)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left"
+                style={{ color: 'var(--text-1)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-2)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
+                {conv.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                {conv.pinned ? 'Lösen' : 'Anheften'}
+              </button>
+              <div style={{ height: '1px', background: 'var(--border)', margin: '2px 0' }} />
+              <button
+                onClick={e => handleDelete(e, conv.id)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left text-red-500"
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
+                <Trash2 size={13} /> Löschen
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /* ── Collapsed sidebar ── */
   if (!sidebarOpen) {
     return (
-      <div className="flex flex-col items-center py-4 gap-3 w-16 h-full border-r border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80">
+      <div
+        className="flex flex-col items-center py-4 gap-3 w-14 h-full shrink-0"
+        style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
+      >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-gray-400"
+          className="p-2 rounded-xl transition-colors"
+          style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          title="Sidebar öffnen"
         >
-          <ChevronLeft size={18} className="rotate-180" />
+          <ChevronLeft size={16} className="rotate-180" />
         </button>
         <button
           onClick={onNewChat}
-          className="p-2 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 shadow-sm"
+          className="p-2 rounded-xl text-white shadow-sm"
+          style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+          title="Neuer Chat"
         >
-          <Plus size={18} />
+          <Plus size={16} />
         </button>
       </div>
     );
   }
 
+  /* ── Full sidebar ── */
   return (
-    <div className="flex flex-col w-64 h-full bg-gray-50/80 dark:bg-gray-900/80 border-r border-gray-100 dark:border-gray-800">
+    <div
+      className="flex flex-col w-[260px] h-full shrink-0 animate-slide-left"
+      style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
+    >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-4">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">M</span>
+      <div className="flex items-center gap-2 px-3 pt-4 pb-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0 px-1">
+          <div
+            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+          >
+            <span className="text-white text-[11px] font-bold">M</span>
           </div>
-          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Max</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>Max</span>
         </div>
         <button
-          onClick={() => setSidebarOpen(false)}
-          className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-400"
-        >
-          <ChevronLeft size={16} />
-        </button>
-      </div>
-
-      {/* New chat button */}
-      <div className="px-3 mb-2">
-        <button
           onClick={onNewChat}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors shadow-sm"
+          className="p-1.5 rounded-lg transition-colors"
+          style={{ color: 'var(--text-2)' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          title="Neuer Chat (Ctrl+K)"
         >
-          <Plus size={16} />
-          Neuer Chat
+          <MessageSquarePlus size={16} />
+        </button>
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="p-1.5 rounded-lg transition-colors"
+          style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          title="Sidebar schließen"
+        >
+          <ChevronLeft size={15} />
         </button>
       </div>
 
       {/* Search */}
-      <div className="px-3 mb-3">
+      <div className="px-3 mb-2">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Suchen…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="w-full pl-8 pr-3 py-2 rounded-xl text-[13px] focus:outline-none transition-colors"
+            style={{
+              background: 'var(--bg-3)',
+              color: 'var(--text-1)',
+              border: '1px solid transparent',
+            }}
+            onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)'}
+            onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'transparent'}
           />
         </div>
       </div>
 
       {/* Conversations */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {pinned.length > 0 && (
-          <div className="mb-2">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-1">Angeheftet</p>
-            {pinned.map(conv => <ConvItem key={conv.id} conv={conv} />)}
+        {filtered.length === 0 ? (
+          <div className="text-center py-10">
+            <Sparkles size={20} className="mx-auto mb-2" style={{ color: 'var(--text-3)' }} />
+            <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
+              {search ? 'Keine Ergebnisse' : 'Noch keine Chats'}
+            </p>
           </div>
-        )}
-        {unpinned.length > 0 && (
-          <div>
+        ) : (
+          <>
+            {/* Pinned */}
             {pinned.length > 0 && (
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-1 mt-3">Letzte</p>
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: 'var(--text-3)' }}>
+                  Angeheftet
+                </p>
+                {pinned.map(c => <ConvItem key={c.id} conv={c} />)}
+              </div>
             )}
-            {unpinned.map(conv => <ConvItem key={conv.id} conv={conv} />)}
-          </div>
-        )}
-        {filtered.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-sm">
-            {search ? 'Keine Ergebnisse' : 'Noch keine Chats'}
-          </div>
+
+            {/* Grouped by date */}
+            {(Object.entries(groups) as [DateGroup, Conversation[]][])
+              .filter(([, items]) => items.length > 0)
+              .map(([group, items]) => (
+                <div key={group} className="mb-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: 'var(--text-3)' }}>
+                    {GROUP_LABELS[group]}
+                  </p>
+                  {items.map(c => <ConvItem key={c.id} conv={c} />)}
+                </div>
+              ))}
+          </>
         )}
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-100 dark:border-gray-800 p-3">
+      <div className="p-2" style={{ borderTop: '1px solid var(--border)' }}>
         <button
           onClick={() => navigate('/settings')}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-colors text-left"
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
         >
           <Avatar name={user?.name || user?.email || '?'} color={user?.avatarColor} size="sm" />
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{user?.name || 'Einstellungen'}</p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium truncate" style={{ color: 'var(--text-1)' }}>
+              {user?.name || 'Einstellungen'}
+            </p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
           </div>
-          <Settings size={14} className="text-gray-400 shrink-0" />
+          <Settings size={14} style={{ color: 'var(--text-3)' }} className="shrink-0" />
         </button>
       </div>
     </div>

@@ -9,6 +9,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push"
   },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",

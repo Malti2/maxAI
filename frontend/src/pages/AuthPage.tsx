@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
@@ -22,62 +21,79 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
-      const body = mode === 'login'
-        ? { email, password }
-        : { email, password, name };
-
-      const { data } = await api.post(endpoint, body);
+      const { data } = await api.post(
+        mode === 'login' ? '/auth/login' : '/auth/register',
+        mode === 'login' ? { email, password } : { email, password, name }
+      );
       setAuth(data.user, data.accessToken, data.refreshToken);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Ein Fehler ist aufgetreten');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Ein Fehler ist aufgetreten');
     } finally {
       setLoading(false);
     }
   };
 
-  const switchMode = () => {
-    setMode(m => m === 'login' ? 'register' : 'login');
-    setError('');
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-purple-50/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center p-4">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-indigo-200/30 dark:bg-indigo-900/20 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-purple-200/30 dark:bg-purple-900/20 blur-3xl" />
-      </div>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: 'var(--bg)' }}
+    >
+      {/* Background blobs */}
+      <div
+        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none opacity-30 dark:opacity-20"
+        style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }}
+      />
+      <div
+        className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] rounded-full blur-3xl pointer-events-none opacity-20 dark:opacity-10"
+        style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }}
+      />
 
-      <div className="relative w-full max-w-sm">
-        {/* Logo */}
+      <div className="relative w-full max-w-[400px]">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/20">
-            <span className="text-white text-2xl font-bold">M</span>
+          <div
+            className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-xl"
+            style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 8px 32px rgba(99,102,241,0.35)' }}
+          >
+            <span className="text-white text-xl font-bold">M</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
             Willkommen bei Max
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+          <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
             Dein persönlicher KI-Assistent
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-xl shadow-gray-200/50 dark:shadow-gray-900/50 p-6 border border-gray-100 dark:border-gray-800">
+        <div
+          className="rounded-3xl p-6"
+          style={{
+            background: 'var(--bg-2)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-xl)',
+          }}
+        >
           {/* Tab switcher */}
-          <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl mb-6">
+          <div
+            className="flex p-1 rounded-2xl mb-6"
+            style={{ background: 'var(--bg-3)' }}
+          >
             {(['login', 'register'] as Mode[]).map(m => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
-                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-                  mode === m
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                }`}
+                onClick={() => { setMode(m); setError(''); }}
+                className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                style={mode === m ? {
+                  background: 'var(--bg)',
+                  color: 'var(--text-1)',
+                  boxShadow: 'var(--shadow-sm)',
+                } : {
+                  color: 'var(--text-3)',
+                  background: 'transparent',
+                }}
               >
                 {m === 'login' ? 'Anmelden' : 'Registrieren'}
               </button>
@@ -87,83 +103,143 @@ export const AuthPage: React.FC = () => {
           <AnimatePresence mode="wait">
             <motion.form
               key={mode}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
               onSubmit={handleSubmit}
-              className="space-y-4"
+              className="space-y-3.5"
             >
               {mode === 'register' && (
-                <Input
-                  label="Name"
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Dein Name"
-                  icon={<User size={16} />}
-                  autoFocus
-                />
+                <div className="relative">
+                  <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Dein Name"
+                    autoFocus
+                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
+                    style={{
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-1)',
+                    }}
+                    onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+                    onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                  />
+                </div>
               )}
 
-              <Input
-                label="E-Mail"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="name@beispiel.de"
-                icon={<Mail size={16} />}
-                required
-                autoFocus={mode === 'login'}
-              />
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Passwort {mode === 'register' && <span className="text-gray-400 font-normal">(min. 8 Zeichen)</span>}
-                </label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@beispiel.de"
+                  required
+                  autoFocus={mode === 'login'}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
+                  style={{
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-1)',
+                  }}
+                  onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+                  onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                />
               </div>
 
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="p-3 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-800 text-sm text-red-600 dark:text-red-400"
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Passwort"
+                  required
+                  className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
+                  style={{
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-1)',
+                  }}
+                  onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+                  onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--text-3)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'}
                 >
-                  {error}
-                </motion.div>
-              )}
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
 
-              <Button type="submit" loading={loading} className="w-full mt-2" size="lg">
-                {mode === 'login' ? 'Anmelden' : 'Konto erstellen'}
-              </Button>
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3.5 py-2.5 rounded-xl text-sm text-red-500" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                      {error}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-2xl text-sm font-semibold text-white transition-all mt-1 disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 2px 12px rgba(99,102,241,0.3)' }}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Einen Moment…
+                  </span>
+                ) : (
+                  mode === 'login' ? 'Anmelden' : 'Konto erstellen'
+                )}
+              </button>
             </motion.form>
           </AnimatePresence>
         </div>
 
-        <p className="text-center text-sm text-gray-400 mt-4">
+        <p className="text-center text-sm mt-4" style={{ color: 'var(--text-3)' }}>
           {mode === 'login' ? 'Noch kein Konto?' : 'Bereits registriert?'}{' '}
-          <button onClick={switchMode} className="text-indigo-500 hover:text-indigo-600 font-medium">
-            {mode === 'login' ? 'Registrieren' : 'Anmelden'}
+          <button
+            onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(''); }}
+            className="font-medium transition-colors"
+            style={{ color: 'var(--accent)' }}
+          >
+            {mode === 'login' ? 'Jetzt registrieren' : 'Anmelden'}
           </button>
         </p>
+
+        {/* Feature pills */}
+        <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
+          {['Max Lite', 'Max Pro', 'Max Beast', 'Auto'].map((f, i) => (
+            <span
+              key={f}
+              className="text-[11px] px-2.5 py-1 rounded-full font-medium"
+              style={{ background: 'var(--bg-2)', color: 'var(--text-3)', border: '1px solid var(--border)' }}
+            >
+              {f}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

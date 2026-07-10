@@ -1,14 +1,19 @@
 import { useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore, Message } from '../store/chatStore';
+import { useChatStore, type Message } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
 export function useChat() {
   const {
-    activeConversationId, selectedModel, setStreaming,
-    addMessage, updateLastMessage, setMessages, addConversation,
-    setActiveConversation, updateConversation, messages,
+    activeConversationId,
+    selectedModel,
+    setStreaming,
+    addMessage,
+    updateLastMessage,
+    addConversation,
+    setActiveConversation,
+    updateConversation,
   } = useChatStore();
   const { accessToken } = useAuthStore();
   const navigate = useNavigate();
@@ -17,8 +22,9 @@ export function useChat() {
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
-    // Create conversation if none active
     let convId = activeConversationId;
+
+    // Create a new conversation if needed
     if (!convId) {
       const { data } = await api.post('/chat/conversations', { model: selectedModel });
       addConversation(data);
@@ -31,16 +37,17 @@ export function useChat() {
 
     // Optimistic user message
     const tempUserMsg: Message = {
-      id: `temp-${Date.now()}`,
+      id: `temp-user-${Date.now()}`,
       role: 'user',
       content,
       createdAt: new Date().toISOString(),
     };
     addMessage(tempUserMsg);
 
-    // Streaming assistant placeholder
+    // Streaming assistant placeholder (empty = shows "thinking" dots)
+    const tempAssistantId = `temp-assistant-${Date.now()}`;
     const tempAssistantMsg: Message = {
-      id: `temp-assistant-${Date.now()}`,
+      id: tempAssistantId,
       role: 'assistant',
       content: '',
       streaming: true,
@@ -48,7 +55,6 @@ export function useChat() {
     };
     addMessage(tempAssistantMsg);
 
-    let assistantContent = '';
     let aborted = false;
 
     try {
@@ -61,11 +67,11 @@ export function useChat() {
         body: JSON.stringify({ content, model: selectedModel }),
       });
 
-      if (!response.ok) {
-        throw new Error('API error');
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const reader = response.body!.getReader();
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
       abortRef.current = () => {
@@ -75,7 +81,7 @@ export function useChat() {
 
       let buffer = '';
       let realUserMsg: Message | null = null;
-      let resolvedModel: string | undefined;
+      let accumulatedContent = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -83,7 +89,7 @@ export function useChat() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
@@ -91,48 +97,58 @@ export function useChat() {
             const event = JSON.parse(line.slice(6));
 
             if (event.type === 'user_message') {
-              realUserMsg = event.message;
-            } else if (event.type === 'model') {
-              resolvedModel = event.model;
+              realUserMsg = event.message as Message;
             } else if (event.type === 'delta') {
-              assistantContent += event.content;
-              updateLastMessage(assistantContent);
+              accumulatedContent += event.content as string;
+              updateLastMessage(accumulatedContent);
             } else if (event.type === 'done') {
-              // Replace temp messages with real ones
-              const realAssistantMsg: Message = {
-                ...event.message,
-                streaming: false,
-              };
-              useChatStore.getState().setMessages(
-                useChatStore.getState().messages
-                  .filter(m => m.id !== tempUserMsg.id && m.id !== tempAssistantMsg.id)
-                  .concat(realUserMsg ? [realUserMsg, realAssistantMsg] : [realAssistantMsg])
-              );
-              // Update conversation title if first message
+              const realAssistantMsg: Message = { ...(event.message as Message), streaming: false };
+              // Replace temp messages with real persisted ones
+              const store = useChatStore.getState();
+              const updated = store.messages
+                .filter(m => m.id !== tempUserMsg.id && m.id !== tempAssistantId)
+                .concat(realUserMsg ? [realUserMsg, realAssistantMsg] : [realAssistantMsg]);
+              store.setMessages(updated);
+
+              // Update conversation title
               updateConversation(convId!, {
                 title: content.slice(0, 60) + (content.length > 60 ? '…' : ''),
                 updatedAt: new Date().toISOString(),
               });
             }
-          } catch (e) {
-            // ignore parse errors
+          } catch {
+            // Ignore malformed SSE lines
           }
         }
       }
     } catch (err) {
       if (!aborted) {
-        updateLastMessage('Fehler beim Laden der Antwort. Bitte versuche es erneut.');
+        updateLastMessage('⚠️ Fehler beim Laden der Antwort. Bitte versuche es erneut.');
+        // Mark streaming as done on the last message
+        const store = useChatStore.getState();
+        const msgs = store.messages.map(m =>
+          m.id === tempAssistantId ? { ...m, streaming: false } : m
+        );
+        store.setMessages(msgs);
       }
     } finally {
       abortRef.current = null;
       setStreaming(false);
     }
-  }, [activeConversationId, selectedModel, accessToken]);
+  }, [activeConversationId, selectedModel, accessToken, navigate,
+      addConversation, setActiveConversation, setStreaming,
+      addMessage, updateLastMessage, updateConversation]);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.();
     setStreaming(false);
-  }, []);
+    // Mark last message as no longer streaming
+    const store = useChatStore.getState();
+    const msgs = store.messages.map((m, i) =>
+      i === store.messages.length - 1 ? { ...m, streaming: false } : m
+    );
+    store.setMessages(msgs);
+  }, [setStreaming]);
 
   return { sendMessage, stopStreaming };
 }

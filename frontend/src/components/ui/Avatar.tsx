@@ -12,15 +12,15 @@ export const Avatar: React.FC<AvatarProps> = ({ name, color = '#6366f1', size = 
     : '?';
 
   const sizes = {
-    xs: 'w-6 h-6 text-[10px]',
-    sm: 'w-7 h-7 text-xs',
-    md: 'w-8 h-8 text-sm',
-    lg: 'w-10 h-10 text-base',
+    xs: 'w-5 h-5 text-[9px] rounded-md',
+    sm: 'w-7 h-7 text-xs rounded-lg',
+    md: 'w-8 h-8 text-sm rounded-xl',
+    lg: 'w-10 h-10 text-sm rounded-xl',
   };
 
   return (
     <div
-      className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold text-white shrink-0`}
+      className={`${sizes[size]} flex items-center justify-center font-semibold text-white shrink-0 select-none`}
       style={{ background: color }}
     >
       {initials}

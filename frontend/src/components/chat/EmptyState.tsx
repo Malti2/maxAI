@@ -1,13 +1,28 @@
 import React from 'react';
-import { MODELS, ModelId } from '../../lib/models';
-import { useChatStore } from '../../store/chatStore';
+import { MODELS } from '../../lib/models';
 import { useAuthStore } from '../../store/authStore';
 
-const SUGGESTIONS = [
-  'Erkläre mir Quantencomputing in einfachen Worten',
-  'Schreibe ein Python-Skript zum Sortieren einer Liste',
-  'Was sind die Unterschiede zwischen React und Vue?',
-  'Hilf mir, eine E-Mail professionell zu formulieren',
+const SUGGESTION_GROUPS = [
+  {
+    icon: '✍️',
+    label: 'Schreiben',
+    items: ['Verfasse eine professionelle E-Mail', 'Schreibe einen Blogpost über KI'],
+  },
+  {
+    icon: '💻',
+    label: 'Code',
+    items: ['Debugge meinen Python-Code', 'Erkläre einen Algorithmus'],
+  },
+  {
+    icon: '🧠',
+    label: 'Analyse',
+    items: ['Analysiere diesen Text', 'Fasse ein Thema zusammen'],
+  },
+  {
+    icon: '💡',
+    label: 'Ideen',
+    items: ['Brainstorming für ein Projekt', 'Gib mir kreative Ideen'],
+  },
 ];
 
 interface EmptyStateProps {
@@ -16,54 +31,94 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestion }) => {
   const { user } = useAuthStore();
-  const { selectedModel } = useChatStore();
 
-  const greeting = user?.name ? `Hallo, ${user.name.split(' ')[0]}` : 'Hallo';
+  const hour = new Date().getHours();
+  const timeGreeting =
+    hour < 5  ? 'Gute Nacht' :
+    hour < 12 ? 'Guten Morgen' :
+    hour < 17 ? 'Guten Tag' :
+    hour < 21 ? 'Guten Abend' : 'Gute Nacht';
+
+  const firstName = user?.name?.split(' ')[0];
+  const greeting = firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting}`;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
-      <div className="text-center mb-8 fade-in-up">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-500/20">
-          <span className="text-white text-2xl font-bold">M</span>
+    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-6 overflow-y-auto">
+      {/* Hero */}
+      <div className="text-center mb-10 animate-fade-up">
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+        >
+          <span className="text-white text-xl font-bold">M</span>
         </div>
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h1 className="text-3xl font-semibold mb-2 gradient-text" style={{ letterSpacing: '-0.02em' }}>
           {greeting} 👋
         </h1>
-        <p className="text-gray-400 dark:text-gray-500 text-base">
+        <p className="text-base" style={{ color: 'var(--text-2)' }}>
           Wie kann ich dir heute helfen?
         </p>
       </div>
 
       {/* Model pills */}
-      <div className="flex items-center gap-2 flex-wrap justify-center mb-8 fade-in-up" style={{ animationDelay: '0.1s' }}>
-        {MODELS.map(m => (
+      <div className="flex items-center gap-2 flex-wrap justify-center mb-8 animate-fade-up" style={{ animationDelay: '60ms' }}>
+        {MODELS.map((m) => (
           <div
             key={m.id}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
             style={{
-              background: `${m.color}10`,
-              borderColor: `${m.color}30`,
+              background: `${m.color}12`,
               color: m.color,
+              border: `1px solid ${m.color}28`,
             }}
           >
-            <span>{m.icon}</span>
-            <span className="text-gray-600 dark:text-gray-400">{m.name}</span>
-            <span style={{ color: m.color }}>{m.badge}</span>
+            <span className="text-[11px]">{m.icon}</span>
+            <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{m.name}</span>
+            <span style={{ color: m.color, fontWeight: 600 }}>{m.badge}</span>
           </div>
         ))}
       </div>
 
-      {/* Suggestions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl w-full fade-in-up" style={{ animationDelay: '0.2s' }}>
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => onSuggestion(s)}
-            className="text-left px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 text-sm text-gray-600 dark:text-gray-400 transition-all duration-150 hover:shadow-sm"
-          >
-            {s}
-          </button>
-        ))}
+      {/* Suggestion grid */}
+      <div
+        className="grid grid-cols-2 gap-2.5 w-full max-w-2xl animate-fade-up"
+        style={{ animationDelay: '120ms' }}
+      >
+        {SUGGESTION_GROUPS.map((group) =>
+          group.items.map((item, i) => (
+            <button
+              key={item}
+              onClick={() => onSuggestion(item)}
+              className="flex items-start gap-3 text-left px-4 py-3.5 rounded-2xl border transition-all hover:scale-[1.01] active:scale-[0.99]"
+              style={{
+                background: 'var(--bg-2)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-2)',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)';
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg-2)';
+              }}
+            >
+              {i === 0 && (
+                <span className="text-base leading-none mt-0.5 shrink-0">{group.icon}</span>
+              )}
+              {i !== 0 && <span className="w-5 shrink-0" />}
+              <div className="min-w-0">
+                {i === 0 && (
+                  <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {group.label}
+                  </p>
+                )}
+                <p className="text-sm leading-snug">{item}</p>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

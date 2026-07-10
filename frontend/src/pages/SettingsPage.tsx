@@ -1,26 +1,85 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, User, Palette, Brain, Moon, Sun, Monitor,
-  Trash2, LogOut, Save, ChevronRight
+  ArrowLeft, User, Palette, Brain, Trash2, LogOut, Check,
+  Moon, Sun, Monitor, ChevronRight
 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { Avatar } from '../components/ui/Avatar';
-import { ModelSelector } from '../components/ui/ModelSelector';
 import { MODELS } from '../lib/models';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useChatStore } from '../store/chatStore';
 import api from '../lib/api';
-import { ModelId } from '../lib/models';
+import type { ModelId } from '../lib/models';
 
 const AVATAR_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f97316',
-  '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
+  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
+  '#f97316', '#eab308', '#10b981', '#3b82f6',
 ];
 
 type Section = 'profile' | 'appearance' | 'models' | 'data';
+
+const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void }> = ({ active, onChange }) => {
+  const items: { id: Section; label: string; icon: React.ReactNode }[] = [
+    { id: 'profile', label: 'Profil', icon: <User size={15} /> },
+    { id: 'appearance', label: 'Erscheinungsbild', icon: <Palette size={15} /> },
+    { id: 'models', label: 'KI & Modelle', icon: <Brain size={15} /> },
+    { id: 'data', label: 'Daten', icon: <Trash2 size={15} /> },
+  ];
+
+  return (
+    <nav className="p-2 space-y-0.5">
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors text-left"
+          style={{
+            background: active === item.id ? 'var(--accent-dim)' : 'transparent',
+            color: active === item.id ? 'var(--accent)' : 'var(--text-2)',
+            fontWeight: active === item.id ? 500 : 400,
+          }}
+          onMouseEnter={e => {
+            if (active !== item.id) (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)';
+          }}
+          onMouseLeave={e => {
+            if (active !== item.id) (e.currentTarget as HTMLElement).style.background = 'transparent';
+          }}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+};
+
+const SaveButton: React.FC<{ onClick: () => void; loading: boolean; saved: boolean }> = ({ onClick, loading, saved }) => (
+  <button
+    onClick={onClick}
+    disabled={loading}
+    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
+    style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 2px 8px rgba(99,102,241,0.3)' }}
+  >
+    {loading ? (
+      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+    ) : saved ? (
+      <><Check size={14} /> Gespeichert</>
+    ) : (
+      'Speichern'
+    )}
+  </button>
+);
+
+const FieldLabel: React.FC<{ label: string; hint?: string }> = ({ label, hint }) => (
+  <div className="mb-1.5">
+    <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{label}</p>
+    {hint && <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{hint}</p>}
+  </div>
+);
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,11 +87,11 @@ export const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useThemeStore();
   const { setConversations } = useChatStore();
 
-  const [activeSection, setActiveSection] = useState<Section>('profile');
+  const [section, setSection] = useState<Section>('profile');
   const [name, setName] = useState(user?.name || '');
-  const [selectedColor, setSelectedColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
-  const [selectedModel, setSelectedModel] = useState<ModelId>((user?.defaultModel as ModelId) || 'auto');
-  const [systemPrompt, setSystemPrompt] = useState<string>(user?.systemPrompt ?? '');
+  const [color, setColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
+  const [model, setModel] = useState<ModelId>((user?.defaultModel as ModelId) || 'auto');
+  const [sysPrompt, setSysPrompt] = useState<string>(user?.systemPrompt ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -42,22 +101,20 @@ export const SettingsPage: React.FC = () => {
     try {
       const { data } = await api.put('/settings', {
         name: name || undefined,
-        defaultModel: selectedModel,
-        avatarColor: selectedColor,
-        systemPrompt: systemPrompt || null,
+        defaultModel: model,
+        avatarColor: color,
+        systemPrompt: sysPrompt || null,
       });
       updateUser(data);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => setSaved(false), 2500);
     } finally {
       setSaving(false);
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout', { refreshToken });
-    } catch {}
+    try { await api.post('/auth/logout', { refreshToken }); } catch {}
     logout();
   };
 
@@ -67,117 +124,54 @@ export const SettingsPage: React.FC = () => {
     setDeleteConfirm(false);
   };
 
-  const navItems = [
-    { id: 'profile' as Section, label: 'Profil', icon: User },
-    { id: 'appearance' as Section, label: 'Erscheinungsbild', icon: Palette },
-    { id: 'models' as Section, label: 'KI-Modelle', icon: Brain },
-    { id: 'data' as Section, label: 'Daten & Datenschutz', icon: Trash2 },
-  ];
+  const inputClass = "w-full px-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors";
+  const inputStyle = {
+    background: 'var(--bg)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-1)',
+  };
 
   const renderSection = () => {
-    switch (activeSection) {
+    switch (section) {
       case 'profile':
         return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar name={name || user?.name || null} color={selectedColor} size="lg" />
+          <div className="space-y-5">
+            {/* Avatar preview */}
+            <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-3)' }}>
+              <Avatar name={name || user?.name || null} color={color} size="lg" />
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">{user?.name || 'Kein Name'}</p>
-                <p className="text-sm text-gray-400">{user?.email}</p>
+                <p className="font-medium text-sm" style={{ color: 'var(--text-1)' }}>{name || user?.name || 'Kein Name'}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
               </div>
             </div>
 
-            <Input
-              label="Name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Dein Name"
-            />
-
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
-                Avatar-Farbe
-              </label>
-              <div className="flex gap-2.5 flex-wrap">
-                {AVATAR_COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full transition-all ${selectedColor === color ? 'scale-110 ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-600' : 'hover:scale-105'}`}
-                    style={{ background: color }}
-                  />
-                ))}
-              </div>
+              <FieldLabel label="Name" />
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Dein Name"
+                className={inputClass}
+                style={inputStyle}
+                onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+                onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+              />
             </div>
 
-            <Button onClick={save} loading={saving}>
-              {saved ? '✓ Gespeichert' : 'Speichern'}
-            </Button>
-          </div>
-        );
-
-      case 'appearance':
-        return (
-          <div className="space-y-4">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Theme</p>
-            {[
-              { value: 'light', label: 'Hell', icon: Sun },
-              { value: 'dark', label: 'Dunkel', icon: Moon },
-              { value: 'system', label: 'System', icon: Monitor },
-            ].map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                onClick={() => setTheme(value as any)}
-                className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
-                  theme === value
-                    ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
-                    : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                }`}
-              >
-                <Icon size={18} className="text-gray-600 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span>
-                {theme === value && (
-                  <div className="ml-auto w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        );
-
-      case 'models':
-        return (
-          <div className="space-y-6">
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Standardmodell</p>
-              <p className="text-xs text-gray-400 mb-3">Wird für neue Chats verwendet, wenn du kein Modell auswählst</p>
-              <div className="space-y-2">
-                {MODELS.map(m => (
+              <FieldLabel label="Avatar-Farbe" />
+              <div className="flex gap-3 flex-wrap">
+                {AVATAR_COLORS.map(c => (
                   <button
-                    key={m.id}
-                    onClick={() => setSelectedModel(m.id as ModelId)}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left ${
-                      selectedModel === m.id
-                        ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
-                        : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                    }`}
+                    key={c}
+                    onClick={() => setColor(c)}
+                    className="w-8 h-8 rounded-full transition-all relative"
+                    style={{ background: c, transform: color === c ? 'scale(1.15)' : 'scale(1)' }}
                   >
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${m.color}15`, color: m.color }}>
-                      {m.icon}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-sm text-gray-700 dark:text-gray-200">{m.name}</span>
-                        <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: `${m.color}20`, color: m.color }}>{m.badge}</span>
-                      </div>
-                      <p className="text-xs text-gray-400">{m.description}</p>
-                    </div>
-                    {selectedModel === m.id && (
-                      <div className="ml-auto w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                    {color === c && (
+                      <div className="absolute inset-0 rounded-full flex items-center justify-center">
+                        <Check size={12} className="text-white" strokeWidth={3} />
                       </div>
                     )}
                   </button>
@@ -185,50 +179,152 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
+            <SaveButton onClick={save} loading={saving} saved={saved} />
+          </div>
+        );
+
+      case 'appearance':
+        return (
+          <div className="space-y-3">
+            <FieldLabel label="Theme" />
+            {[
+              { value: 'light', label: 'Hell', icon: <Sun size={16} />, desc: 'Helles Interface' },
+              { value: 'dark', label: 'Dunkel', icon: <Moon size={16} />, desc: 'Dunkles Interface' },
+              { value: 'system', label: 'System', icon: <Monitor size={16} />, desc: 'Folgt dem Systemmodus' },
+            ].map(({ value, label, icon, desc }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value as 'light' | 'dark' | 'system')}
+                className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left"
+                style={{
+                  borderColor: theme === value ? 'var(--accent)' : 'var(--border)',
+                  background: theme === value ? 'var(--accent-dim)' : 'var(--bg)',
+                }}
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}>
+                  {icon}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{desc}</p>
+                </div>
+                {theme === value && <Check size={15} style={{ color: 'var(--accent)' }} />}
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'models':
+        return (
+          <div className="space-y-5">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">
-                Systemanweisung
-              </label>
-              <p className="text-xs text-gray-400 mb-2">Gibt Max eine globale Verhaltensanweisung für alle Chats</p>
-              <textarea
-                value={systemPrompt}
-                onChange={e => setSystemPrompt(e.target.value)}
-                placeholder="z.B. Antworte immer auf Deutsch. Sei präzise und direkt."
-                rows={4}
-                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
-              />
+              <FieldLabel label="Standardmodell" hint="Wird für neue Chats verwendet" />
+              <div className="space-y-2 mt-2">
+                {MODELS.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => setModel(m.id as ModelId)}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                    style={{
+                      borderColor: model === m.id ? m.color + '60' : 'var(--border)',
+                      background: model === m.id ? m.color + '08' : 'var(--bg)',
+                    }}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${m.color}15`, color: m.color }}>
+                      {m.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{m.name}</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: `${m.color}18`, color: m.color }}>{m.badge}</span>
+                      </div>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>{m.description}</p>
+                    </div>
+                    {model === m.id && <Check size={14} style={{ color: m.color }} />}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <Button onClick={save} loading={saving}>
-              {saved ? '✓ Gespeichert' : 'Speichern'}
-            </Button>
+            <div>
+              <FieldLabel label="Systemanweisung" hint="Globales Verhalten von Max für alle Chats" />
+              <textarea
+                value={sysPrompt}
+                onChange={e => setSysPrompt(e.target.value)}
+                placeholder="z.B. Antworte immer auf Deutsch. Sei präzise und direkt. Du bist ein erfahrener Softwareentwickler…"
+                rows={4}
+                className="w-full px-4 py-3 rounded-2xl text-sm focus:outline-none resize-none transition-colors"
+                style={{ ...inputStyle, lineHeight: '1.6' }}
+                onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+                onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+              />
+              <p className="text-xs mt-1.5" style={{ color: 'var(--text-3)' }}>
+                {sysPrompt.length} / 2000 Zeichen
+              </p>
+            </div>
+
+            <SaveButton onClick={save} loading={saving} saved={saved} />
           </div>
         );
 
       case 'data':
         return (
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-              <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-1">Chat-Verlauf löschen</h3>
-              <p className="text-sm text-gray-400 mb-3">Alle Konversationen und Nachrichten werden unwiderruflich gelöscht.</p>
+          <div className="space-y-3">
+            {/* Delete history */}
+            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Chat-Verlauf löschen</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
+                Alle Konversationen und Nachrichten werden unwiderruflich gelöscht.
+              </p>
               {!deleteConfirm ? (
-                <Button variant="danger" size="sm" onClick={() => setDeleteConfirm(true)}>
+                <button
+                  onClick={() => setDeleteConfirm(true)}
+                  className="px-3.5 py-2 rounded-xl text-sm font-medium text-red-500 transition-colors"
+                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
+                >
                   Verlauf löschen
-                </Button>
+                </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button variant="danger" size="sm" onClick={handleDeleteAll}>Ja, wirklich löschen</Button>
-                  <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>Abbrechen</Button>
+                  <button
+                    onClick={handleDeleteAll}
+                    className="px-3.5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors"
+                  >
+                    Ja, löschen
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(false)}
+                    className="px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
+                    style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}
+                  >
+                    Abbrechen
+                  </button>
                 </div>
               )}
             </div>
 
-            <div className="p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-              <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-1">Abmelden</h3>
-              <p className="text-sm text-gray-400 mb-3">Du wirst aus deinem Konto abgemeldet.</p>
-              <Button variant="secondary" size="sm" onClick={handleLogout} className="gap-2">
+            {/* Logout */}
+            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Abmelden</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
+                Du wirst auf allen Geräten abgemeldet.
+              </p>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
+                style={{ background: 'var(--bg-3)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
+              >
                 <LogOut size={14} /> Abmelden
-              </Button>
+              </button>
+            </div>
+
+            {/* Account info */}
+            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Account</p>
+              <p className="text-sm" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
             </div>
           </div>
         );
@@ -236,40 +332,39 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-950">
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-800">
+      <div
+        className="flex items-center gap-3 px-4 py-3.5 shrink-0"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
         <button
           onClick={() => navigate(-1)}
-          className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-gray-400"
+          className="p-1.5 rounded-xl transition-colors"
+          style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-2)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={17} />
         </button>
-        <h1 className="text-base font-semibold text-gray-900 dark:text-white">Einstellungen</h1>
+        <h1 className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Einstellungen</h1>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Nav */}
-        <div className="w-52 border-r border-gray-100 dark:border-gray-800 p-3 shrink-0">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveSection(id)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors text-left ${
-                activeSection === id
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-medium'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-black/4 dark:hover:bg-white/4'
-              }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
+        <div className="w-52 shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}>
+          <SectionNav active={section} onChange={setSection} />
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-lg">
+          <div className="max-w-md">
+            <h2 className="text-base font-semibold mb-5" style={{ color: 'var(--text-1)' }}>
+              {section === 'profile' ? 'Profil'
+                : section === 'appearance' ? 'Erscheinungsbild'
+                : section === 'models' ? 'KI & Modelle'
+                : 'Daten & Datenschutz'}
+            </h2>
             {renderSection()}
           </div>
         </div>

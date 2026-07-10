@@ -5,11 +5,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# Copy schema first for Prisma generation
+COPY src/prisma/schema.prisma ./prisma/schema.prisma
+RUN npx prisma generate
+
 COPY . .
-
-# Generate Prisma client
-RUN npx prisma generate --schema=./src/prisma/schema.prisma
-
 RUN npm run build
 
 FROM node:22-alpine AS runner
@@ -26,7 +26,6 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY src/prisma/schema.prisma ./prisma/schema.prisma
 
-# Migration script
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
