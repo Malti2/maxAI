@@ -8,6 +8,7 @@ export interface User {
   onboardingDone: boolean;
   defaultModel: string;
   personality: string;
+  chatMode: boolean;
   avatarColor: string;
   systemPrompt: string | null;
 }

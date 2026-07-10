@@ -18,6 +18,7 @@ model User {
   onboardingDone  Boolean   @default(false)
   defaultModel    String    @default("auto")
   personality     String    @default("assistant")
+  chatMode        Boolean   @default(false)
   systemPrompt    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
 import { EmptyState } from '../components/chat/EmptyState';
-import { useChatStore } from '../store/chatStore';
+import { useChatStore, type Message } from '../store/chatStore';
+import { useAuthStore } from '../store/authStore';
 import { useChat } from '../hooks/useChat';
 import api from '../lib/api';
 import { Menu, ChevronDown } from 'lucide-react';
@@ -14,14 +15,18 @@ export const ChatPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const {
     messages, setMessages, activeConversationId, setActiveConversation,
-    conversations, sidebarOpen, setSidebarOpen, isStreaming
+    conversations, sidebarOpen, setSidebarOpen, isStreaming,
+    enqueuePending, addMessage,
   } = useChatStore();
+  const { user } = useAuthStore();
   const { sendMessage, stopStreaming } = useChat();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  const chatModeEnabled = user?.chatMode ?? false;
 
   // Load conversation
   useEffect(() => {
@@ -58,11 +63,28 @@ export const ChatPage: React.FC = () => {
     setShowScrollBtn(distFromBottom > 200);
   };
 
-  // Keyboard shortcut: Ctrl/Cmd+K = new chat (handled in AppLayout)
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim()) return;
     const msg = input;
     setInput('');
+
+    if (isStreaming && chatModeEnabled) {
+      // Chat Mode: add message to queue and show it in UI immediately
+      const tempPendingMsg: Message = {
+        id: `pending-${Date.now()}`,
+        role: 'user',
+        content: msg,
+        createdAt: new Date().toISOString(),
+        pending: true,
+      };
+      addMessage(tempPendingMsg);
+      enqueuePending(msg);
+      scrollToBottom();
+      return;
+    }
+
+    if (isStreaming) return;
+
     await sendMessage(msg);
     scrollToBottom();
   };
@@ -150,6 +172,7 @@ export const ChatPage: React.FC = () => {
         onChange={setInput}
         onSend={handleSend}
         onStop={stopStreaming}
+        chatModeEnabled={chatModeEnabled}
       />
     </div>
   );

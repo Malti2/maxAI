@@ -9,6 +9,7 @@ export interface Message {
   tokens?: number;
   createdAt: string;
   streaming?: boolean;
+  pending?: boolean; // shown immediately in UI, waiting to be sent to AI
 }
 
 export interface Conversation {
@@ -28,7 +29,8 @@ interface ChatState {
   selectedModel: ModelId;
   isStreaming: boolean;
   sidebarOpen: boolean;
-  
+  pendingQueue: string[]; // Chat Mode: messages queued while AI is responding
+
   setConversations: (convs: Conversation[]) => void;
   addConversation: (conv: Conversation) => void;
   updateConversation: (id: string, updates: Partial<Conversation>) => void;
@@ -41,6 +43,8 @@ interface ChatState {
   setSelectedModel: (model: ModelId) => void;
   setSidebarOpen: (v: boolean) => void;
   clearMessages: () => void;
+  enqueuePending: (content: string) => void;
+  clearPendingQueue: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -50,6 +54,7 @@ export const useChatStore = create<ChatState>((set) => ({
   selectedModel: 'auto',
   isStreaming: false,
   sidebarOpen: true,
+  pendingQueue: [],
 
   setConversations: (conversations) => set({ conversations }),
   addConversation: (conv) => set((s) => ({ conversations: [conv, ...s.conversations] })),
@@ -73,4 +78,6 @@ export const useChatStore = create<ChatState>((set) => ({
   setSelectedModel: (selectedModel) => set({ selectedModel }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   clearMessages: () => set({ messages: [] }),
+  enqueuePending: (content) => set((s) => ({ pendingQueue: [...s.pendingQueue, content] })),
+  clearPendingQueue: () => set({ pendingQueue: [] }),
 }));

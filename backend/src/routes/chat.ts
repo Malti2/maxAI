@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { streamChat, selectAutoModel, ModelId } from '../services/azure';
-import { buildSystemPrompt } from '../services/personalities';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -99,11 +98,13 @@ router.post('/conversations/:id/pin', authenticate, async (req: AuthRequest, res
 const SendMessageSchema = z.object({
   content: z.string().min(1),
   model: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
+  // Chat Mode: additional messages that arrived while AI was responding
+  pendingMessages: z.array(z.string()).optional(),
 });
 
 router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { content, model } = SendMessageSchema.parse(req.body);
+    const { content, model, pendingMessages } = SendMessageSchema.parse(req.body);
 
     const conv = await prisma.conversation.findFirst({
       where: { id: req.params.id, userId: req.userId },
@@ -117,17 +118,41 @@ router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const selectedModel = (model || conv.model || 'auto') as ModelId;
 
-    // Save user message
+    // Save primary user message
     const userMsg = await prisma.message.create({
       data: { conversationId: conv.id, role: 'user', content },
     });
+
+    // Save any pending (queued) messages from Chat Mode
+    const savedPendingMsgs = [];
+    if (pendingMessages && pendingMessages.length > 0) {
+      for (const pm of pendingMessages) {
+        const msg = await prisma.message.create({
+          data: { conversationId: conv.id, role: 'user', content: pm },
+        });
+        savedPendingMsgs.push(msg);
+      }
+    }
 
     // Build message history for API
     const history = conv.messages.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant' | 'system',
       content: m.content,
     }));
+
+    // Add the primary message
     history.push({ role: 'user', content });
+
+    // If Chat Mode pending messages exist, add a context note + all pending messages
+    if (pendingMessages && pendingMessages.length > 0) {
+      history.push({
+        role: 'system',
+        content: `[Chat Mode] The user sent ${pendingMessages.length} additional message${pendingMessages.length > 1 ? 's' : ''} while you were responding. They arrived in order and should be treated as a natural continuation of the conversation — reply to all of them together as you would in a real chat.`,
+      });
+      for (const pm of pendingMessages) {
+        history.push({ role: 'user', content: pm });
+      }
+    }
 
     // Auto-select model if needed
     let resolvedModel = selectedModel;
@@ -141,18 +166,19 @@ router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    // Send user message id first
+    // Send user message id and any pending message ids first
     res.write(`data: ${JSON.stringify({ type: 'user_message', message: userMsg })}\n\n`);
+    if (savedPendingMsgs.length > 0) {
+      res.write(`data: ${JSON.stringify({ type: 'pending_messages', messages: savedPendingMsgs })}\n\n`);
+    }
     res.write(`data: ${JSON.stringify({ type: 'model', model: resolvedModel })}\n\n`);
 
     let fullContent = '';
 
-    const systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
-
     const result = await streamChat(
       selectedModel,
       history,
-      systemPrompt,
+      user?.systemPrompt || undefined,
       (chunk) => {
         fullContent += chunk;
         res.write(`data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`);

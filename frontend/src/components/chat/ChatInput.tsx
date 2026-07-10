@@ -10,13 +10,13 @@ interface ChatInputProps {
   onChange: (v: string) => void;
   onSend: () => void;
   onStop?: () => void;
+  chatModeEnabled?: boolean;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, onStop }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, onStop, chatModeEnabled }) => {
   const { isStreaming, selectedModel, setSelectedModel } = useChatStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus on mount
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
@@ -24,11 +24,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, o
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isStreaming && value.trim()) onSend();
+      const canSendNow = value.trim() && (!isStreaming || chatModeEnabled);
+      if (canSendNow) onSend();
     }
   };
 
-  const canSend = value.trim().length > 0 && !isStreaming;
+  // In Chat Mode, allow sending while streaming
+  const canSend = value.trim().length > 0 && (!isStreaming || chatModeEnabled);
 
   return (
     <div className="px-4 pb-5 pt-2 shrink-0">
@@ -37,8 +39,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, o
           className="input-box relative rounded-2xl border overflow-hidden"
           style={{
             background: 'var(--bg)',
-            borderColor: 'var(--border-2)',
+            borderColor: isStreaming && chatModeEnabled ? 'var(--accent)' : 'var(--border-2)',
             boxShadow: 'var(--shadow-lg)',
+            transition: 'border-color 0.2s',
           }}
         >
           <TextareaAutosize
@@ -46,7 +49,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, o
             value={value}
             onChange={e => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Schreibe eine Nachricht…  (⇧↵ für neue Zeile)"
+            placeholder={isStreaming && chatModeEnabled
+              ? 'Message will be queued…'
+              : 'Schreibe eine Nachricht…  (⇧↵ für neue Zeile)'
+            }
             minRows={1}
             maxRows={12}
             className="w-full px-4 pt-3.5 pb-12 text-[15px] leading-relaxed resize-none focus:outline-none"
@@ -70,7 +76,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, o
                 </span>
               )}
 
-              {isStreaming ? (
+              {isStreaming && !chatModeEnabled ? (
                 <button
                   onClick={onStop}
                   className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors"

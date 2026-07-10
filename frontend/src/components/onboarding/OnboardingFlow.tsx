@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight, MessageCircle } from 'lucide-react';
 import { MODELS } from '../../lib/models';
 import { PERSONALITIES, DEFAULT_PERSONALITY, type PersonalityId } from '../../lib/personalities';
 import { useAuthStore } from '../../store/authStore';
@@ -22,6 +22,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [selectedModel, setSelectedModel] = useState(user?.defaultModel || 'auto');
   const [selectedColor, setSelectedColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || DEFAULT_PERSONALITY);
+  const [chatMode, setChatMode] = useState<boolean>(false);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
@@ -32,6 +33,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     { id: 'personality' },
     { id: 'color' },
     { id: 'model' },
+    { id: 'chatmode' },
     { id: 'system' },
     { id: 'done' },
   ] as const;
@@ -50,6 +52,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         name: name || undefined,
         defaultModel: selectedModel,
         personality,
+        chatMode,
         avatarColor: selectedColor,
         systemPrompt: systemPrompt || null,
         onboardingDone: true,
@@ -227,6 +230,53 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
+      case 'chatmode':
+        return (
+          <div className="space-y-4 w-full">
+            <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
+              Want to chat more naturally? <span style={{ color: 'var(--text-3)' }}>(Jederzeit änderbar)</span>
+            </p>
+            <button
+              onClick={() => setChatMode(v => !v)}
+              className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+              style={{
+                borderColor: chatMode ? '#6366f170' : 'var(--border)',
+                background: chatMode ? '#6366f10a' : 'var(--bg-3)',
+              }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: chatMode ? '#6366f115' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+              >
+                <MessageCircle size={17} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Chat Mode</span>
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{ background: chatMode ? '#6366f118' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                  >
+                    {chatMode ? 'On' : 'Off'}
+                  </span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                  Messages sent while Max is responding are queued and delivered together — Max replies naturally to all of them at once.
+                </p>
+              </div>
+              <div
+                className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
+                style={{ background: chatMode ? '#6366f1' : 'var(--border-2)' }}
+              >
+                <div
+                  className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                  style={{ left: chatMode ? '22px' : '4px' }}
+                />
+              </div>
+            </button>
+          </div>
+        );
+
       case 'system':
         return (
           <div className="space-y-3 w-full">
@@ -279,7 +329,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'var(--bg)' }}
     >
-      {/* Background blobs */}
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
       <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }} />
 
@@ -287,7 +336,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         className="relative w-full max-w-md rounded-3xl overflow-hidden"
         style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
       >
-        {/* Progress bar */}
         <div className="h-1" style={{ background: 'var(--bg-3)' }}>
           <div
             className="h-full transition-all duration-500"
@@ -296,12 +344,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         </div>
 
         <div className="p-8">
-          {/* Step indicator */}
           <p className="text-center text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--accent)' }}>
             Schritt {step + 1} von {TOTAL}
           </p>
 
-          {/* Animated content */}
           <div className="min-h-[300px] flex items-center justify-center">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
@@ -319,7 +365,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             </AnimatePresence>
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between mt-6">
             <button
               onClick={back}
@@ -332,7 +377,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               Zurück
             </button>
 
-            {/* Step dots */}
             <div className="flex items-center gap-1.5">
               {STEPS.map((_, i) => (
                 <div

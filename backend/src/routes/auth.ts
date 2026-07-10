@@ -62,8 +62,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         onboardingDone: user.onboardingDone,
         defaultModel: user.defaultModel,
         personality: user.personality,
+        chatMode: user.chatMode,
         avatarColor: user.avatarColor,
-        systemPrompt: user.systemPrompt,
       },
     });
   } catch (err) {
@@ -109,6 +109,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         onboardingDone: user.onboardingDone,
         defaultModel: user.defaultModel,
         personality: user.personality,
+        chatMode: user.chatMode,
         avatarColor: user.avatarColor,
         systemPrompt: user.systemPrompt,
       },
@@ -171,6 +172,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise
     onboardingDone: user.onboardingDone,
     defaultModel: user.defaultModel,
     personality: user.personality,
+    chatMode: user.chatMode,
     avatarColor: user.avatarColor,
     systemPrompt: user.systemPrompt,
   });

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Palette, Brain, Trash2, LogOut, Check,
-  Moon, Sun, Monitor, ChevronRight
+  Moon, Sun, Monitor, MessageCircle
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { MODELS } from '../lib/models';
@@ -93,6 +93,7 @@ export const SettingsPage: React.FC = () => {
   const [color, setColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [model, setModel] = useState<ModelId>((user?.defaultModel as ModelId) || 'auto');
   const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || 'assistant');
+  const [chatMode, setChatMode] = useState<boolean>(user?.chatMode ?? false);
   const [sysPrompt, setSysPrompt] = useState<string>(user?.systemPrompt ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -105,6 +106,7 @@ export const SettingsPage: React.FC = () => {
         name: name || undefined,
         defaultModel: model,
         personality,
+        chatMode,
         avatarColor: color,
         systemPrompt: sysPrompt || null,
       });
@@ -139,7 +141,6 @@ export const SettingsPage: React.FC = () => {
       case 'profile':
         return (
           <div className="space-y-5">
-            {/* Avatar preview */}
             <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-3)' }}>
               <Avatar name={name || user?.name || null} color={color} size="lg" />
               <div>
@@ -220,6 +221,50 @@ export const SettingsPage: React.FC = () => {
       case 'models':
         return (
           <div className="space-y-5">
+            {/* Chat Mode toggle */}
+            <div>
+              <FieldLabel label="Chat Mode" hint="Send messages while Max is responding" />
+              <button
+                onClick={() => setChatMode(v => !v)}
+                className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                style={{
+                  borderColor: chatMode ? '#6366f1' + '60' : 'var(--border)',
+                  background: chatMode ? '#6366f1' + '08' : 'var(--bg)',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: chatMode ? '#6366f115' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                >
+                  <MessageCircle size={17} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Chat Mode</span>
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
+                      style={{ background: chatMode ? '#6366f118' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                    >
+                      {chatMode ? 'On' : 'Off'}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                    Messages sent while Max is responding are queued and delivered together — Max replies naturally to all of them at once.
+                  </p>
+                </div>
+                {/* Toggle switch */}
+                <div
+                  className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
+                  style={{ background: chatMode ? '#6366f1' : 'var(--border-2)' }}
+                >
+                  <div
+                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                    style={{ left: chatMode ? '22px' : '4px' }}
+                  />
+                </div>
+              </button>
+            </div>
+
             <div>
               <FieldLabel label="Persönlichkeit" hint="Bestimmt Tonfall und Stil von Max" />
               <div className="space-y-2 mt-2">
@@ -306,7 +351,6 @@ export const SettingsPage: React.FC = () => {
       case 'data':
         return (
           <div className="space-y-3">
-            {/* Delete history */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
               <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Chat-Verlauf löschen</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
@@ -341,7 +385,6 @@ export const SettingsPage: React.FC = () => {
               )}
             </div>
 
-            {/* Logout */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
               <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Abmelden</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
@@ -351,13 +394,11 @@ export const SettingsPage: React.FC = () => {
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ background: 'var(--bg-3)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
               >
                 <LogOut size={14} /> Abmelden
               </button>
             </div>
 
-            {/* Account info */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Account</p>
               <p className="text-sm" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
@@ -369,7 +410,6 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3.5 shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
@@ -387,12 +427,10 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Nav */}
         <div className="w-52 shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}>
           <SectionNav active={section} onChange={setSection} />
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-md">
             <h2 className="text-base font-semibold mb-5" style={{ color: 'var(--text-1)' }}>

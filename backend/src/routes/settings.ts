@@ -11,6 +11,7 @@ const UpdateSettingsSchema = z.object({
   name: z.string().min(2).optional(),
   defaultModel: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
   personality: z.enum(PERSONALITY_IDS as [string, ...string[]]).optional(),
+  chatMode: z.boolean().optional(),
   systemPrompt: z.string().max(2000).optional().nullable(),
   avatarColor: z.string().optional(),
   onboardingDone: z.boolean().optional(),
@@ -30,6 +31,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       onboardingDone: user.onboardingDone,
       defaultModel: user.defaultModel,
       personality: user.personality,
+      chatMode: user.chatMode,
       avatarColor: user.avatarColor,
       systemPrompt: user.systemPrompt,
     });
