@@ -44,3 +44,4 @@ nginx/certs/
 # TypeScript
 *.tsbuildinfo
 .claude/
+skills-lock.json
