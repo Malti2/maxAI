@@ -5,8 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy schema first for Prisma generation
-COPY src/prisma/schema.prisma ./prisma/schema.prisma
+# Copy the Prisma schema first so the client can be generated before the
+# rest of the source is copied (better layer caching).
+COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY . .
@@ -24,7 +25,10 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY src/prisma/schema.prisma ./prisma/schema.prisma
+
+# Ship the schema *and* the migration history so `prisma migrate deploy`
+# can apply pending migrations at container start.
+COPY prisma ./prisma
 
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh

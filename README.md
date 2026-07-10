@@ -1,109 +1,134 @@
 # maxAI 🚀
 
-**maxAI** ist die Plattform. **Max** ist der Name der KI – dein persönlicher Assistent mit eigenem ChatGPT-ähnlichem Interface, betrieben von Azure OpenAI.
+**maxAI** is the platform. **Max** is the name of the AI — your personal assistant with its own ChatGPT-like interface, powered by Azure OpenAI.
 
 ## Features
 
-- **4 Modelle**: Max Lite ◈, Max Pro ◆, Max Beast ⬡, Auto ✦
-- **3 Persönlichkeiten**: Casual (locker & direkt), Assistant (ausgewogen), Professional (formell)
-- **Apple-ähnliches Design**: Runde Ecken, Glaseffekte, saubere Typographie
-- **Chat-Verlauf**: Suche, Anheften, Löschen
-- **Streaming**: Antworten werden in Echtzeit ausgegeben
-- **Login + Registrierung**: JWT-basiert mit Refresh Tokens
-- **Onboarding**: Schritt-für-Schritt Setup beim ersten Login (inkl. Persönlichkeitswahl)
-- **Einstellungen**: Profil, Theme (Hell/Dunkel/System), Persönlichkeit, Standardmodell, Systemanweisung
-- **Markdown**: Volle Unterstützung inkl. Code-Highlighting
-- **Auto-Modus**: Wählt automatisch das passende Modell je nach Komplexität
+- **4 models**: Max Lite ◈, Max Pro ◆, Max Beast ⬡, Auto ✦
+- **3 personalities**: Casual (relaxed & direct), Assistant (balanced), Professional (formal)
+- **Chat Mode**: message-by-message chatting with queued messages, tapback reactions and replies
+- **Apple-like design**: rounded corners, glass effects, clean typography
+- **Chat history**: search, pin, delete
+- **Streaming**: responses are rendered in real time
+- **Login + registration**: JWT-based with refresh tokens
+- **Onboarding**: step-by-step setup on first login (incl. personality choice)
+- **Settings**: profile, theme (light/dark/system), personality, default model, system instruction
+- **Markdown**: full support incl. code highlighting
+- **Auto mode**: automatically picks the right model based on complexity
 
-## Persönlichkeiten
+## Personalities
 
-Max kann in drei Persönlichkeiten antworten. Die Wahl legt Identität, Tonfall und Formatierung fest; eine optionale eigene Systemanweisung wird zusätzlich obendrauf gelegt.
+Max can respond in three personalities. The choice sets identity, tone and formatting; an optional custom system instruction is layered on top.
 
-| Persönlichkeit | Stil | Beschreibung |
+| Personality | Style | Description |
 |----------------|------|--------------|
-| **Casual** | locker & direkt | Wie eine Nachricht von einem cleveren Freund – kleingeschrieben, kurz, ohne Floskeln, keine Emojis |
-| **Assistant** | ausgewogen (Standard) | Freundlich und klar mit sauberer Markdown-Formatierung |
-| **Professional** | formell & präzise | Sachlich, strukturiert und geschäftstauglich |
+| **Casual** | relaxed & direct | Like a text from a clever friend — lowercase, short, no fluff, no emojis |
+| **Assistant** | balanced (default) | Friendly and clear with clean Markdown formatting |
+| **Professional** | formal & precise | Objective, structured and business-ready |
 
-Die Persönlichkeit wird pro Benutzer gespeichert (`User.personality`, Standard: `assistant`) und serverseitig als System-Prompt gesetzt (`backend/src/services/personalities.ts`).
+The personality is stored per user (`User.personality`, default: `assistant`) and applied server-side as a system prompt (`backend/src/services/personalities.ts`).
 
-## Schnellstart (VPS)
+## Chat Mode
 
-### 1. Voraussetzungen
+When enabled in Settings, Chat Mode turns maxAI into a live, message-by-message chat:
+
+- **Queued messages**: send more messages while Max is still responding — they are delivered together and Max replies to all of them at once.
+- **Tapbacks**: react to any message with a tapback (❤️ 👍 👎 😂 ‼️ ❓). You can react to Max's messages, and Max can react to yours. When a tapback is added, the model is told which message was reacted to and with what.
+- **Replies**: reply to a specific earlier message, like in a real chat app. The quoted message is shown above yours and the model is given the reply context.
+
+Tapbacks and replies are only available while Chat Mode is enabled.
+
+## Quick start (VPS)
+
+### 1. Prerequisites
 
 ```bash
-# Docker installieren (falls nicht vorhanden)
+# Install Docker (if not already present)
 curl -fsSL https://get.docker.com | sh
 systemctl enable docker && systemctl start docker
 ```
 
-### 2. Konfiguration
+### 2. Configuration
 
 ```bash
 cp .env.example .env
-nano .env  # Azure API Keys und Secrets eintragen
+nano .env  # enter Azure API keys and secrets
 ```
 
-**Wichtige Variablen in `.env`:**
+**Important variables in `.env`:**
 
-| Variable | Beschreibung |
+| Variable | Description |
 |----------|-------------|
-| `POSTGRES_PASSWORD` | Sicheres Datenbankpasswort |
-| `JWT_SECRET` | Zufälliger Schlüssel (`openssl rand -hex 64`) |
-| `AZURE_ENDPOINT` | Azure OpenAI Endpoint URL |
-| `AZURE_API_KEY` | Azure API Key |
-| `AZURE_DEPLOYMENT_LITE` | Deployment-Name für Max Lite (z.B. `gpt-4o-mini`) |
-| `AZURE_DEPLOYMENT_PRO` | Deployment-Name für Max Pro (z.B. `gpt-4o`) |
-| `AZURE_DEPLOYMENT_BEAST` | Deployment-Name für Max Beast |
+| `POSTGRES_PASSWORD` | Secure database password |
+| `JWT_SECRET` | Random key (`openssl rand -hex 64`) |
+| `AZURE_ENDPOINT` | Azure OpenAI endpoint URL |
+| `AZURE_API_KEY` | Azure API key |
+| `AZURE_DEPLOYMENT_LITE` | Deployment name for Max Lite (e.g. `gpt-4o-mini`) |
+| `AZURE_DEPLOYMENT_PRO` | Deployment name for Max Pro (e.g. `gpt-4o`) |
+| `AZURE_DEPLOYMENT_BEAST` | Deployment name for Max Beast |
 
-### 3. Starten
+### 3. Start
 
 ```bash
 bash setup.sh
-# oder manuell:
+# or manually:
 docker compose up -d
 ```
 
-## Architektur
+## Architecture
 
 ```
 ├── frontend/        React + TypeScript + Tailwind CSS (Vite)
 ├── backend/         Node.js + Express + TypeScript
 │   ├── src/
-│   │   ├── routes/  auth.ts, chat.ts, settings.ts
-│   │   ├── services/ azure.ts (OpenAI Streaming), personalities.ts (System-Prompts)
-│   │   └── prisma/  schema.prisma
-├── nginx/           Reverse Proxy Konfiguration
+│   │   ├── routes/    auth.ts, chat.ts, settings.ts
+│   │   ├── services/  azure.ts (OpenAI streaming), personalities.ts (system prompts),
+│   │   │              chatMode.ts (Chat Mode control protocol), reactions.ts (tapbacks)
+│   └── prisma/        schema.prisma + migrations/
+├── nginx/           reverse proxy configuration
 └── docker-compose.yml
 ```
 
-## Modelle
+## Database migrations
 
-| Modell | Farbe | Verwendung |
+The schema lives in `backend/prisma/schema.prisma` and the migration history in
+`backend/prisma/migrations/`. On container start, `entrypoint.sh` runs
+`prisma migrate deploy`, which applies any pending migrations non-destructively.
+
+To create a new migration during development:
+
+```bash
+cd backend
+npx prisma migrate dev --name your_change
+```
+
+## Models
+
+| Model | Color | Use |
 |--------|-------|-----------|
-| Max Lite ◈ | Blau | Kurze, einfache Anfragen |
-| Max Pro ◆ | Violett | Komplexe Aufgaben |
-| Max Beast ⬡ | Orange | Maximale Leistung |
-| Max Auto ✦ | Grün | Automatische Auswahl |
+| Max Lite ◈ | Blue | Short, simple requests |
+| Max Pro ◆ | Violet | Complex tasks |
+| Max Beast ⬡ | Orange | Maximum performance |
+| Max Auto ✦ | Green | Automatic selection |
 
-## Entwicklung
+## Development
 
 ```bash
 # Backend
 cd backend && npm install
 npm run dev
 
-# Frontend (neues Terminal)
+# Frontend (new terminal)
 cd frontend && npm install
 npm run dev
 ```
 
-## Nützliche Befehle
+## Useful commands
 
 ```bash
-docker compose logs -f backend    # Backend-Logs
-docker compose logs -f frontend   # Frontend-Logs
-docker compose restart backend    # Backend neu starten
-docker compose down               # Alles stoppen
-docker compose up -d --build      # Mit Rebuild starten
+docker compose logs -f backend    # Backend logs
+docker compose logs -f frontend   # Frontend logs
+docker compose restart backend    # Restart backend
+docker compose down               # Stop everything
+docker compose up -d --build      # Start with rebuild
 ```

@@ -40,7 +40,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       res.status(400).json({ error: err.errors[0].message });
       return;
     }
-    res.status(500).json({ error: 'Interner Fehler' });
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 

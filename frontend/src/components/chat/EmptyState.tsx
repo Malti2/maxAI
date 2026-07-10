@@ -5,23 +5,23 @@ import { useAuthStore } from '../../store/authStore';
 const SUGGESTION_GROUPS = [
   {
     icon: '✍️',
-    label: 'Schreiben',
-    items: ['Verfasse eine professionelle E-Mail', 'Schreibe einen Blogpost über KI'],
+    label: 'Write',
+    items: ['Draft a professional email', 'Write a blog post about AI'],
   },
   {
     icon: '💻',
     label: 'Code',
-    items: ['Debugge meinen Python-Code', 'Erkläre einen Algorithmus'],
+    items: ['Debug my Python code', 'Explain an algorithm'],
   },
   {
     icon: '🧠',
-    label: 'Analyse',
-    items: ['Analysiere diesen Text', 'Fasse ein Thema zusammen'],
+    label: 'Analyze',
+    items: ['Analyze this text', 'Summarize a topic'],
   },
   {
     icon: '💡',
-    label: 'Ideen',
-    items: ['Brainstorming für ein Projekt', 'Gib mir kreative Ideen'],
+    label: 'Ideas',
+    items: ['Brainstorm for a project', 'Give me creative ideas'],
   },
 ];
 
@@ -34,10 +34,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestion }) => {
 
   const hour = new Date().getHours();
   const timeGreeting =
-    hour < 5  ? 'Gute Nacht' :
-    hour < 12 ? 'Guten Morgen' :
-    hour < 17 ? 'Guten Tag' :
-    hour < 21 ? 'Guten Abend' : 'Gute Nacht';
+    hour < 5  ? 'Good night' :
+    hour < 12 ? 'Good morning' :
+    hour < 17 ? 'Good afternoon' :
+    hour < 21 ? 'Good evening' : 'Good night';
 
   const firstName = user?.name?.split(' ')[0];
   const greeting = firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting}`;
@@ -56,7 +56,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestion }) => {
           {greeting} 👋
         </h1>
         <p className="text-base" style={{ color: 'var(--text-2)' }}>
-          Wie kann ich dir heute helfen?
+          How can I help you today?
         </p>
       </div>
 

@@ -11,7 +11,7 @@ import { ModelBadge } from '../ui/ModelBadge';
 import type { ModelId } from '../../lib/models';
 import api from '../../lib/api';
 import { formatDistanceToNow, isToday, isYesterday, subDays, isAfter } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 interface SidebarProps {
   onNewChat: () => void;
@@ -28,11 +28,11 @@ function getDateGroup(date: Date): DateGroup {
 }
 
 const GROUP_LABELS: Record<DateGroup, string> = {
-  today: 'Heute',
-  yesterday: 'Gestern',
-  week: 'Letzte 7 Tage',
-  month: 'Letzter Monat',
-  older: 'Älter',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  week: 'Last 7 days',
+  month: 'Last month',
+  older: 'Older',
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
@@ -103,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           <div className="flex items-center gap-1.5 mt-0.5">
             <ModelBadge modelId={conv.model as ModelId} size="xs" showName={false} />
             <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>
-              {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true, locale: de })}
+              {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true, locale: enUS })}
             </span>
           </div>
         </div>
@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
               >
                 {conv.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-                {conv.pinned ? 'Lösen' : 'Anheften'}
+                {conv.pinned ? 'Unpin' : 'Pin'}
               </button>
               <div style={{ height: '1px', background: 'var(--border)', margin: '2px 0' }} />
               <button
@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
               >
-                <Trash2 size={13} /> Löschen
+                <Trash2 size={13} /> Delete
               </button>
             </div>
           )}
@@ -164,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           style={{ color: 'var(--text-3)' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="Sidebar öffnen"
+          title="Open sidebar"
         >
           <ChevronLeft size={16} className="rotate-180" />
         </button>
@@ -172,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           onClick={onNewChat}
           className="p-2 rounded-xl text-white shadow-sm"
           style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
-          title="Neuer Chat"
+          title="New chat"
         >
           <Plus size={16} />
         </button>
@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           style={{ color: 'var(--text-2)' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="Neuer Chat (Ctrl+K)"
+          title="New chat (Ctrl+K)"
         >
           <MessageSquarePlus size={16} />
         </button>
@@ -213,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           style={{ color: 'var(--text-3)' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="Sidebar schließen"
+          title="Close sidebar"
         >
           <ChevronLeft size={15} />
         </button>
@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Suchen…"
+            placeholder="Search…"
             className="w-full pl-8 pr-3 py-2 rounded-xl text-[13px] focus:outline-none transition-colors"
             style={{
               background: 'var(--bg-3)',
@@ -245,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           <div className="text-center py-10">
             <Sparkles size={20} className="mx-auto mb-2" style={{ color: 'var(--text-3)' }} />
             <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
-              {search ? 'Keine Ergebnisse' : 'Noch keine Chats'}
+              {search ? 'No results' : 'No chats yet'}
             </p>
           </div>
         ) : (
@@ -254,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
             {pinned.length > 0 && (
               <div className="mb-3">
                 <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: 'var(--text-3)' }}>
-                  Angeheftet
+                  Pinned
                 </p>
                 {pinned.map(c => <ConvItem key={c.id} conv={c} />)}
               </div>
@@ -286,7 +286,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
           <Avatar name={user?.name || user?.email || '?'} color={user?.avatarColor} size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium truncate" style={{ color: 'var(--text-1)' }}>
-              {user?.name || 'Einstellungen'}
+              {user?.name || 'Settings'}
             </p>
             <p className="text-[11px] truncate" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
           </div>

@@ -22,10 +22,10 @@ type Section = 'profile' | 'appearance' | 'models' | 'data';
 
 const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void }> = ({ active, onChange }) => {
   const items: { id: Section; label: string; icon: React.ReactNode }[] = [
-    { id: 'profile', label: 'Profil', icon: <User size={15} /> },
-    { id: 'appearance', label: 'Erscheinungsbild', icon: <Palette size={15} /> },
-    { id: 'models', label: 'KI & Modelle', icon: <Brain size={15} /> },
-    { id: 'data', label: 'Daten', icon: <Trash2 size={15} /> },
+    { id: 'profile', label: 'Profile', icon: <User size={15} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
+    { id: 'models', label: 'AI & Models', icon: <Brain size={15} /> },
+    { id: 'data', label: 'Data', icon: <Trash2 size={15} /> },
   ];
 
   return (
@@ -68,9 +68,9 @@ const SaveButton: React.FC<{ onClick: () => void; loading: boolean; saved: boole
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
     ) : saved ? (
-      <><Check size={14} /> Gespeichert</>
+      <><Check size={14} /> Saved</>
     ) : (
-      'Speichern'
+      'Save'
     )}
   </button>
 );
@@ -144,7 +144,7 @@ export const SettingsPage: React.FC = () => {
             <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-3)' }}>
               <Avatar name={name || user?.name || null} color={color} size="lg" />
               <div>
-                <p className="font-medium text-sm" style={{ color: 'var(--text-1)' }}>{name || user?.name || 'Kein Name'}</p>
+                <p className="font-medium text-sm" style={{ color: 'var(--text-1)' }}>{name || user?.name || 'No name'}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
               </div>
             </div>
@@ -155,7 +155,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="Dein Name"
+                placeholder="Your name"
                 className={inputClass}
                 style={inputStyle}
                 onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
@@ -164,7 +164,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Avatar-Farbe" />
+              <FieldLabel label="Avatar color" />
               <div className="flex gap-3 flex-wrap">
                 {AVATAR_COLORS.map(c => (
                   <button
@@ -192,9 +192,9 @@ export const SettingsPage: React.FC = () => {
           <div className="space-y-3">
             <FieldLabel label="Theme" />
             {[
-              { value: 'light', label: 'Hell', icon: <Sun size={16} />, desc: 'Helles Interface' },
-              { value: 'dark', label: 'Dunkel', icon: <Moon size={16} />, desc: 'Dunkles Interface' },
-              { value: 'system', label: 'System', icon: <Monitor size={16} />, desc: 'Folgt dem Systemmodus' },
+              { value: 'light', label: 'Light', icon: <Sun size={16} />, desc: 'Light interface' },
+              { value: 'dark', label: 'Dark', icon: <Moon size={16} />, desc: 'Dark interface' },
+              { value: 'system', label: 'System', icon: <Monitor size={16} />, desc: 'Follows your system setting' },
             ].map(({ value, label, icon, desc }) => (
               <button
                 key={value}
@@ -266,7 +266,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Persönlichkeit" hint="Bestimmt Tonfall und Stil von Max" />
+              <FieldLabel label="Personality" hint="Controls Max's tone and style" />
               <div className="space-y-2 mt-2">
                 {PERSONALITIES.map(p => {
                   const Icon = p.icon;
@@ -299,7 +299,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Standardmodell" hint="Wird für neue Chats verwendet" />
+              <FieldLabel label="Default model" hint="Used for new chats" />
               <div className="space-y-2 mt-2">
                 {MODELS.map(m => (
                   <button
@@ -328,11 +328,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Systemanweisung" hint="Zusätzliche Anweisung, die zur gewählten Persönlichkeit hinzukommt" />
+              <FieldLabel label="System instruction" hint="An extra instruction layered on top of the chosen personality" />
               <textarea
                 value={sysPrompt}
                 onChange={e => setSysPrompt(e.target.value)}
-                placeholder="z.B. Antworte immer auf Deutsch. Sei präzise und direkt. Du bist ein erfahrener Softwareentwickler…"
+                placeholder="e.g. Always answer in English. Be precise and direct. You are an experienced software engineer…"
                 rows={4}
                 className="w-full px-4 py-3 rounded-2xl text-sm focus:outline-none resize-none transition-colors"
                 style={{ ...inputStyle, lineHeight: '1.6' }}
@@ -340,7 +340,7 @@ export const SettingsPage: React.FC = () => {
                 onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
               />
               <p className="text-xs mt-1.5" style={{ color: 'var(--text-3)' }}>
-                {sysPrompt.length} / 2000 Zeichen
+                {sysPrompt.length} / 2000 characters
               </p>
             </div>
 
@@ -352,9 +352,9 @@ export const SettingsPage: React.FC = () => {
         return (
           <div className="space-y-3">
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Chat-Verlauf löschen</p>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Delete chat history</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
-                Alle Konversationen und Nachrichten werden unwiderruflich gelöscht.
+                All conversations and messages will be permanently deleted.
               </p>
               {!deleteConfirm ? (
                 <button
@@ -364,7 +364,7 @@ export const SettingsPage: React.FC = () => {
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
                 >
-                  Verlauf löschen
+                  Delete history
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
@@ -372,30 +372,30 @@ export const SettingsPage: React.FC = () => {
                     onClick={handleDeleteAll}
                     className="px-3.5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors"
                   >
-                    Ja, löschen
+                    Yes, delete
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(false)}
                     className="px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
                     style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}
                   >
-                    Abbrechen
+                    Cancel
                   </button>
                 </div>
               )}
             </div>
 
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Abmelden</p>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Log out</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
-                Du wirst auf allen Geräten abgemeldet.
+                You will be logged out on all devices.
               </p>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ background: 'var(--bg-3)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
               >
-                <LogOut size={14} /> Abmelden
+                <LogOut size={14} /> Log out
               </button>
             </div>
 
@@ -423,7 +423,7 @@ export const SettingsPage: React.FC = () => {
         >
           <ArrowLeft size={17} />
         </button>
-        <h1 className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Einstellungen</h1>
+        <h1 className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Settings</h1>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -434,10 +434,10 @@ export const SettingsPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-md">
             <h2 className="text-base font-semibold mb-5" style={{ color: 'var(--text-1)' }}>
-              {section === 'profile' ? 'Profil'
-                : section === 'appearance' ? 'Erscheinungsbild'
-                : section === 'models' ? 'KI & Modelle'
-                : 'Daten & Datenschutz'}
+              {section === 'profile' ? 'Profile'
+                : section === 'appearance' ? 'Appearance'
+                : section === 'models' ? 'AI & Models'
+                : 'Data & Privacy'}
             </h2>
             {renderSection()}
           </div>

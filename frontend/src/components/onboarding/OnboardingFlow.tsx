@@ -85,11 +85,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             </div>
             <div>
               <h2 className="text-2xl font-semibold mb-2" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
-                Willkommen bei maxAI
+                Welcome to maxAI
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-2)' }}>
-                Dein persönlicher KI-Assistent mit mehreren Modellen –<br />
-                von blitzschnell bis hochleistungsfähig.
+                Your personal AI assistant with multiple models –<br />
+                from lightning-fast to high-performance.
               </p>
             </div>
             <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
@@ -110,14 +110,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="space-y-4 w-full">
             <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
-              Damit Max dich persönlich ansprechen kann.
+              So Max can address you personally.
             </p>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && canProceed && next()}
-              placeholder="z.B. Malte"
+              placeholder="e.g. Malte"
               autoFocus
               className="w-full px-4 py-3 rounded-2xl text-base text-center focus:outline-none transition-all"
               style={{
@@ -135,7 +135,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="space-y-2 w-full">
             <p className="text-sm text-center mb-3" style={{ color: 'var(--text-2)' }}>
-              Wie soll Max mit dir sprechen? <span style={{ color: 'var(--text-3)' }}>(Jederzeit änderbar)</span>
+              How should Max talk to you? <span style={{ color: 'var(--text-3)' }}>(Changeable anytime)</span>
             </p>
             {PERSONALITIES.map(p => {
               const Icon = p.icon;
@@ -170,7 +170,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       case 'color':
         return (
           <div className="flex flex-col items-center gap-5">
-            <p className="text-sm" style={{ color: 'var(--text-2)' }}>Wähle eine Farbe für deinen Avatar.</p>
+            <p className="text-sm" style={{ color: 'var(--text-2)' }}>Choose a color for your avatar.</p>
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg transition-all duration-300"
               style={{ background: selectedColor, boxShadow: `0 8px 24px ${selectedColor}50` }}
@@ -202,7 +202,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="space-y-2 w-full">
             <p className="text-sm text-center mb-3" style={{ color: 'var(--text-2)' }}>
-              Wähle dein Standardmodell für neue Chats.
+              Choose your default model for new chats.
             </p>
             {MODELS.map(m => (
               <button
@@ -234,7 +234,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="space-y-4 w-full">
             <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
-              Want to chat more naturally? <span style={{ color: 'var(--text-3)' }}>(Jederzeit änderbar)</span>
+              Want to chat more naturally? <span style={{ color: 'var(--text-3)' }}>(Changeable anytime)</span>
             </p>
             <button
               onClick={() => setChatMode(v => !v)}
@@ -281,12 +281,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="space-y-3 w-full">
             <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
-              Gib Max eine globale Verhaltensanweisung. <span style={{ color: 'var(--text-3)' }}>(Optional)</span>
+              Give Max a global behavior instruction. <span style={{ color: 'var(--text-3)' }}>(Optional)</span>
             </p>
             <textarea
               value={systemPrompt}
               onChange={e => setSystemPrompt(e.target.value)}
-              placeholder="z.B. Antworte immer auf Deutsch. Sei präzise und direkt. Du bist ein erfahrener Entwickler…"
+              placeholder="e.g. Always answer in English. Be precise and direct. You are an experienced developer…"
               rows={4}
               className="w-full px-4 py-3 rounded-2xl text-sm focus:outline-none resize-none transition-all"
               style={{
@@ -299,7 +299,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
             />
             <p className="text-xs text-center" style={{ color: 'var(--text-3)' }}>
-              Jederzeit in den Einstellungen änderbar.
+              Changeable anytime in settings.
             </p>
           </div>
         );
@@ -310,11 +310,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             <div className="text-5xl">🎉</div>
             <div>
               <h3 className="text-xl font-semibold" style={{ color: 'var(--text-1)' }}>
-                Alles bereit{name ? `, ${name.split(' ')[0]}` : ''}!
+                All set{name ? `, ${name.split(' ')[0]}` : ''}!
               </h3>
               <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
-                Max steht dir jetzt zur Verfügung.<br />
-                Du kannst alle Einstellungen jederzeit anpassen.
+                Max is ready for you.<br />
+                You can adjust every setting anytime.
               </p>
             </div>
           </div>
@@ -345,7 +345,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
 
         <div className="p-8">
           <p className="text-center text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--accent)' }}>
-            Schritt {step + 1} von {TOTAL}
+            Step {step + 1} of {TOTAL}
           </p>
 
           <div className="min-h-[300px] flex items-center justify-center">
@@ -374,7 +374,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--border)'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
             >
-              Zurück
+              Back
             </button>
 
             <div className="flex items-center gap-1.5">
@@ -399,7 +399,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
                 style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
               >
-                {step === 0 ? 'Los geht\'s' : 'Weiter'}
+                {step === 0 ? "Let's go" : 'Next'}
                 <ArrowRight size={14} />
               </button>
             ) : (
@@ -414,7 +414,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                ) : 'Fertig 🚀'}
+                ) : 'Done 🚀'}
               </button>
             )}
           </div>

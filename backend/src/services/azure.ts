@@ -19,7 +19,7 @@ function getModelConfigs(): Record<string, ModelConfig> {
       deployment: process.env.AZURE_DEPLOYMENT_LITE || 'gpt-4o-mini',
       apiVersion: process.env.AZURE_API_VERSION || '2024-08-01-preview',
       displayName: 'Max Lite',
-      description: 'Schnell & effizient für alltägliche Aufgaben',
+      description: 'Fast & efficient for everyday tasks',
     },
     pro: {
       endpoint: process.env.AZURE_ENDPOINT_PRO || process.env.AZURE_ENDPOINT || '',
@@ -27,7 +27,7 @@ function getModelConfigs(): Record<string, ModelConfig> {
       deployment: process.env.AZURE_DEPLOYMENT_PRO || 'gpt-4o',
       apiVersion: process.env.AZURE_API_VERSION || '2024-08-01-preview',
       displayName: 'Max Pro',
-      description: 'Leistungsstark für komplexe Aufgaben',
+      description: 'Powerful for complex tasks',
     },
     beast: {
       endpoint: process.env.AZURE_ENDPOINT_BEAST || process.env.AZURE_ENDPOINT || '',
@@ -35,7 +35,7 @@ function getModelConfigs(): Record<string, ModelConfig> {
       deployment: process.env.AZURE_DEPLOYMENT_BEAST || 'gpt-4o',
       apiVersion: process.env.AZURE_API_VERSION || '2024-08-01-preview',
       displayName: 'Max Beast',
-      description: 'Maximale Leistung für anspruchsvollste Aufgaben',
+      description: 'Maximum performance for the most demanding tasks',
     },
   };
 }
@@ -48,7 +48,10 @@ export function selectAutoModel(messages: Array<{ role: string; content: string 
   const content = lastUserMessage.content;
   const wordCount = content.split(/\s+/).length;
   const hasCode = /```|function|class|import|export|const |let |var /.test(content);
-  const hasComplexTerms = /analys|erkläre|vergleich|erstelle|schreib|berechne|optimier/i.test(content);
+  // Detect complexity cues in both English and German so Auto works
+  // regardless of the language the user writes in.
+  const hasComplexTerms =
+    /analy[sz]|explain|compare|create|write|calculate|optimi[sz]e|debug|refactor|design|erkläre|vergleich|erstelle|schreib|berechne|optimier/i.test(content);
 
   if (wordCount > 150 || hasCode || hasComplexTerms) {
     return 'beast';

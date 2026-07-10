@@ -4,6 +4,10 @@ import { useChatStore, type Message } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
+interface SendOptions {
+  replyToId?: string | null;
+}
+
 export function useChat() {
   const {
     activeConversationId,
@@ -14,14 +18,13 @@ export function useChat() {
     addConversation,
     setActiveConversation,
     updateConversation,
-    pendingQueue,
     clearPendingQueue,
   } = useChatStore();
-  const { accessToken, user } = useAuthStore();
+  const { accessToken } = useAuthStore();
   const navigate = useNavigate();
   const abortRef = useRef<(() => void) | null>(null);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, options: SendOptions = {}) => {
     if (!content.trim()) return;
 
     let convId = activeConversationId;
@@ -48,6 +51,7 @@ export function useChat() {
       role: 'user',
       content,
       createdAt: new Date().toISOString(),
+      replyToId: options.replyToId ?? null,
     };
     addMessage(tempUserMsg);
 
@@ -74,6 +78,7 @@ export function useChat() {
         body: JSON.stringify({
           content,
           model: selectedModel,
+          ...(options.replyToId ? { replyToId: options.replyToId } : {}),
           // Pass any Chat Mode queued messages
           ...(queueSnapshot.length > 0 ? { pendingMessages: queueSnapshot } : {}),
         }),
@@ -94,6 +99,7 @@ export function useChat() {
       let buffer = '';
       let realUserMsg: Message | null = null;
       let realPendingMsgs: Message[] = [];
+      let aiReaction: { messageId: string; reaction: string } | null = null;
       let accumulatedContent = '';
 
       while (true) {
@@ -113,23 +119,32 @@ export function useChat() {
               realUserMsg = event.message as Message;
             } else if (event.type === 'pending_messages') {
               realPendingMsgs = event.messages as Message[];
+            } else if (event.type === 'reaction') {
+              aiReaction = { messageId: event.messageId, reaction: event.reaction };
             } else if (event.type === 'delta') {
               accumulatedContent += event.content as string;
               updateLastMessage(accumulatedContent);
             } else if (event.type === 'done') {
-              const realAssistantMsg: Message = { ...(event.message as Message), streaming: false };
-              // Replace temp messages with real persisted ones
-              // Also replace any optimistic pending messages in the UI
+              const realAssistantMsg = event.message
+                ? [{ ...(event.message as Message), streaming: false }]
+                : [];
+              // Replace temp messages with real persisted ones. Also drop any
+              // optimistic pending messages (they come back via realPendingMsgs).
               const currentStore = useChatStore.getState();
               const filtered = currentStore.messages.filter(
                 m => m.id !== tempUserMsg.id && m.id !== tempAssistantId && !m.pending
               );
-              const realMsgs = [
+              let realMsgs: Message[] = [
                 ...filtered,
                 ...(realUserMsg ? [realUserMsg] : []),
                 ...realPendingMsgs,
-                realAssistantMsg,
+                ...realAssistantMsg,
               ];
+              // Apply an AI-authored tapback to its (now persisted) target.
+              if (aiReaction) {
+                const r = aiReaction;
+                realMsgs = realMsgs.map(m => (m.id === r.messageId ? { ...m, reaction: r.reaction } : m));
+              }
               currentStore.setMessages(realMsgs);
 
               // Update conversation title
@@ -143,9 +158,9 @@ export function useChat() {
           }
         }
       }
-    } catch (err) {
+    } catch {
       if (!aborted) {
-        updateLastMessage('⚠️ Fehler beim Laden der Antwort. Bitte versuche es erneut.');
+        updateLastMessage('⚠️ Failed to load the response. Please try again.');
         const currentStore = useChatStore.getState();
         const msgs = currentStore.messages.map(m =>
           m.id === tempAssistantId ? { ...m, streaming: false } : m
@@ -159,7 +174,7 @@ export function useChat() {
   }, [activeConversationId, selectedModel, accessToken, navigate,
       addConversation, setActiveConversation, setStreaming,
       addMessage, updateLastMessage, updateConversation,
-      pendingQueue, clearPendingQueue]);
+      clearPendingQueue]);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.();
