@@ -2,10 +2,24 @@ import { useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore, type Message } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
+import { toast } from '../store/toastStore';
+import { playSend, playReceive } from '../lib/sounds';
 import api from '../lib/api';
 
 interface SendOptions {
   replyToId?: string | null;
+}
+
+interface StreamOptions {
+  url: string;
+  method: 'POST' | 'PUT';
+  body: Record<string, unknown>;
+  convId: string;
+  // Temp message ids that should be replaced by their persisted counterparts.
+  tempIds: string[];
+  assistantTempId: string;
+  // Set the conversation title from this text if it is the first exchange.
+  titleSeed?: string | null;
 }
 
 export function useChat() {
@@ -14,7 +28,6 @@ export function useChat() {
     selectedModel,
     setStreaming,
     addMessage,
-    updateLastMessage,
     addConversation,
     setActiveConversation,
     updateConversation,
@@ -24,167 +37,267 @@ export function useChat() {
   const navigate = useNavigate();
   const abortRef = useRef<(() => void) | null>(null);
 
-  const sendMessage = useCallback(async (content: string, options: SendOptions = {}) => {
-    if (!content.trim()) return;
+  // ── Core SSE consumer, shared by send / regenerate / edit ──────────
+  const runStream = useCallback(
+    async (opts: StreamOptions) => {
+      const { url, method, body, convId, tempIds, assistantTempId, titleSeed } = opts;
+      setStreaming(true);
 
-    let convId = activeConversationId;
+      let aborted = false;
+      let receivedFirstDelta = false;
 
-    // Create a new conversation if needed
-    if (!convId) {
-      const { data } = await api.post('/chat/conversations', { model: selectedModel });
-      addConversation(data);
-      setActiveConversation(data.id);
-      convId = data.id;
-      navigate(`/chat/${data.id}`, { replace: true });
-    }
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        });
 
-    // Snapshot the pending queue and clear it before starting
-    const store = useChatStore.getState();
-    const queueSnapshot = [...store.pendingQueue];
-    clearPendingQueue();
+        if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
 
-    setStreaming(true);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        abortRef.current = () => {
+          aborted = true;
+          reader.cancel().catch(() => {});
+        };
 
-    // Optimistic user message
-    const tempUserMsg: Message = {
-      id: `temp-user-${Date.now()}`,
-      role: 'user',
-      content,
-      createdAt: new Date().toISOString(),
-      replyToId: options.replyToId ?? null,
-    };
-    addMessage(tempUserMsg);
+        let buffer = '';
+        let realUserMsg: Message | null = null;
+        let realPendingMsgs: Message[] = [];
+        let aiReaction: { messageId: string; reaction: string } | null = null;
+        let accumulated = '';
 
-    // Streaming assistant placeholder (empty = shows "thinking" dots)
-    const tempAssistantId = `temp-assistant-${Date.now()}`;
-    const tempAssistantMsg: Message = {
-      id: tempAssistantId,
-      role: 'assistant',
-      content: '',
-      streaming: true,
-      createdAt: new Date().toISOString(),
-    };
-    addMessage(tempAssistantMsg);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || aborted) break;
 
-    let aborted = false;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
 
-    try {
-      const response = await fetch(`/api/chat/conversations/${convId}/messages`, {
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            let event: Record<string, unknown>;
+            try {
+              event = JSON.parse(line.slice(6));
+            } catch {
+              continue;
+            }
+
+            switch (event.type) {
+              case 'user_message':
+                realUserMsg = event.message as Message;
+                break;
+              case 'pending_messages':
+                realPendingMsgs = event.messages as Message[];
+                break;
+              case 'reaction':
+                aiReaction = { messageId: event.messageId as string, reaction: event.reaction as string };
+                break;
+              case 'delta': {
+                if (!receivedFirstDelta) {
+                  receivedFirstDelta = true;
+                  playReceive();
+                }
+                accumulated += event.content as string;
+                useChatStore.getState().updateMessageContent(assistantTempId, accumulated);
+                break;
+              }
+              case 'done': {
+                const store = useChatStore.getState();
+                const realAssistant = event.message
+                  ? [{ ...(event.message as Message), streaming: false }]
+                  : [];
+                const appended = [
+                  ...(realUserMsg ? [realUserMsg] : []),
+                  ...realPendingMsgs,
+                  ...realAssistant,
+                ];
+                const appendedIds = new Set(appended.map((m) => m.id));
+                const filtered = store.messages.filter(
+                  (m) => !tempIds.includes(m.id) && !m.pending && !appendedIds.has(m.id)
+                );
+                let final: Message[] = [...filtered, ...appended];
+                if (aiReaction) {
+                  const r = aiReaction;
+                  final = final.map((m) => (m.id === r.messageId ? { ...m, reaction: r.reaction } : m));
+                }
+                store.setMessages(final);
+
+                // Only the first exchange names the conversation.
+                if (titleSeed) {
+                  updateConversation(convId, {
+                    title: titleSeed.slice(0, 60) + (titleSeed.length > 60 ? '…' : ''),
+                    updatedAt: new Date().toISOString(),
+                    preview: accumulated.replace(/\s+/g, ' ').trim().slice(0, 120),
+                  });
+                } else {
+                  updateConversation(convId, {
+                    updatedAt: new Date().toISOString(),
+                    preview: accumulated.replace(/\s+/g, ' ').trim().slice(0, 120),
+                  });
+                }
+                break;
+              }
+              case 'error':
+                throw new Error((event.error as string) || 'Stream error');
+            }
+          }
+        }
+      } catch {
+        if (!aborted) {
+          const store = useChatStore.getState();
+          store.patchMessage(assistantTempId, { streaming: false });
+          const hasContent = store.messages.find((m) => m.id === assistantTempId)?.content;
+          if (!hasContent) {
+            store.updateMessageContent(assistantTempId, '⚠️ Something went wrong. Please try again.');
+          }
+          toast.error('Max could not respond. Please try again.');
+        }
+      } finally {
+        // Ensure the placeholder is no longer marked as streaming.
+        useChatStore.getState().patchMessage(assistantTempId, { streaming: false });
+        abortRef.current = null;
+        setStreaming(false);
+      }
+    },
+    [accessToken, setStreaming, updateConversation]
+  );
+
+  // ── Send a new message ────────────────────────────────────────────
+  const sendMessage = useCallback(
+    async (content: string, options: SendOptions = {}) => {
+      if (!content.trim()) return;
+
+      let convId = activeConversationId;
+      let isNew = false;
+      if (!convId) {
+        const { data } = await api.post('/chat/conversations', { model: selectedModel });
+        addConversation(data);
+        setActiveConversation(data.id);
+        convId = data.id;
+        isNew = true;
+        navigate(`/chat/${data.id}`, { replace: true });
+      }
+
+      const store = useChatStore.getState();
+      const isFirst = isNew || store.messages.filter((m) => m.role === 'user').length === 0;
+      const queueSnapshot = [...store.pendingQueue];
+      clearPendingQueue();
+
+      playSend();
+
+      const now = Date.now();
+      const tempUserId = `temp-user-${now}`;
+      const tempAssistantId = `temp-assistant-${now}`;
+
+      addMessage({
+        id: tempUserId,
+        role: 'user',
+        content,
+        createdAt: new Date().toISOString(),
+        replyToId: options.replyToId ?? null,
+      });
+      addMessage({
+        id: tempAssistantId,
+        role: 'assistant',
+        content: '',
+        streaming: true,
+        createdAt: new Date().toISOString(),
+      });
+
+      await runStream({
+        url: `/api/chat/conversations/${convId}/messages`,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
+        body: {
           content,
           model: selectedModel,
           ...(options.replyToId ? { replyToId: options.replyToId } : {}),
-          // Pass any Chat Mode queued messages
           ...(queueSnapshot.length > 0 ? { pendingMessages: queueSnapshot } : {}),
-        }),
+        },
+        convId: convId!,
+        tempIds: [tempUserId, tempAssistantId],
+        assistantTempId: tempAssistantId,
+        titleSeed: isFirst ? content : null,
       });
+    },
+    [activeConversationId, selectedModel, navigate, addConversation, setActiveConversation, addMessage, clearPendingQueue, runStream]
+  );
 
-      if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+  // ── Regenerate the last assistant reply ────────────────────────────
+  const regenerate = useCallback(async () => {
+    const store = useChatStore.getState();
+    const convId = store.activeConversationId;
+    if (!convId || store.isStreaming) return;
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+    // Drop trailing assistant messages locally, then add a fresh placeholder.
+    const msgs = [...store.messages];
+    let i = msgs.length - 1;
+    while (i >= 0 && msgs[i].role !== 'user') i--;
+    if (i < 0) return;
+    const kept = msgs.slice(0, i + 1);
 
-      abortRef.current = () => {
-        aborted = true;
-        reader.cancel();
-      };
+    const tempAssistantId = `temp-assistant-${Date.now()}`;
+    store.setMessages([
+      ...kept,
+      { id: tempAssistantId, role: 'assistant', content: '', streaming: true, createdAt: new Date().toISOString() },
+    ]);
 
-      let buffer = '';
-      let realUserMsg: Message | null = null;
-      let realPendingMsgs: Message[] = [];
-      let aiReaction: { messageId: string; reaction: string } | null = null;
-      let accumulatedContent = '';
+    await runStream({
+      url: `/api/chat/conversations/${convId}/regenerate`,
+      method: 'POST',
+      body: { model: selectedModel },
+      convId,
+      tempIds: [tempAssistantId],
+      assistantTempId: tempAssistantId,
+    });
+  }, [selectedModel, runStream]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done || aborted) break;
+  // ── Edit a user message and re-stream from that point ──────────────
+  const editMessage = useCallback(
+    async (messageId: string, content: string) => {
+      const store = useChatStore.getState();
+      const convId = store.activeConversationId;
+      if (!convId || store.isStreaming || !content.trim()) return;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+      const idx = store.messages.findIndex((m) => m.id === messageId);
+      if (idx === -1) return;
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
+      const kept = store.messages.slice(0, idx);
+      const editedMsg: Message = { ...store.messages[idx], content, edited: true };
+      const tempAssistantId = `temp-assistant-${Date.now()}`;
+      store.setMessages([
+        ...kept,
+        editedMsg,
+        { id: tempAssistantId, role: 'assistant', content: '', streaming: true, createdAt: new Date().toISOString() },
+      ]);
 
-            if (event.type === 'user_message') {
-              realUserMsg = event.message as Message;
-            } else if (event.type === 'pending_messages') {
-              realPendingMsgs = event.messages as Message[];
-            } else if (event.type === 'reaction') {
-              aiReaction = { messageId: event.messageId, reaction: event.reaction };
-            } else if (event.type === 'delta') {
-              accumulatedContent += event.content as string;
-              updateLastMessage(accumulatedContent);
-            } else if (event.type === 'done') {
-              const realAssistantMsg = event.message
-                ? [{ ...(event.message as Message), streaming: false }]
-                : [];
-              // Replace temp messages with real persisted ones. Also drop any
-              // optimistic pending messages (they come back via realPendingMsgs).
-              const currentStore = useChatStore.getState();
-              const filtered = currentStore.messages.filter(
-                m => m.id !== tempUserMsg.id && m.id !== tempAssistantId && !m.pending
-              );
-              let realMsgs: Message[] = [
-                ...filtered,
-                ...(realUserMsg ? [realUserMsg] : []),
-                ...realPendingMsgs,
-                ...realAssistantMsg,
-              ];
-              // Apply an AI-authored tapback to its (now persisted) target.
-              if (aiReaction) {
-                const r = aiReaction;
-                realMsgs = realMsgs.map(m => (m.id === r.messageId ? { ...m, reaction: r.reaction } : m));
-              }
-              currentStore.setMessages(realMsgs);
+      playSend();
 
-              // Update conversation title
-              updateConversation(convId!, {
-                title: content.slice(0, 60) + (content.length > 60 ? '…' : ''),
-                updatedAt: new Date().toISOString(),
-              });
-            }
-          } catch {
-            // Ignore malformed SSE lines
-          }
-        }
-      }
-    } catch {
-      if (!aborted) {
-        updateLastMessage('⚠️ Failed to load the response. Please try again.');
-        const currentStore = useChatStore.getState();
-        const msgs = currentStore.messages.map(m =>
-          m.id === tempAssistantId ? { ...m, streaming: false } : m
-        );
-        currentStore.setMessages(msgs);
-      }
-    } finally {
-      abortRef.current = null;
-      setStreaming(false);
-    }
-  }, [activeConversationId, selectedModel, accessToken, navigate,
-      addConversation, setActiveConversation, setStreaming,
-      addMessage, updateLastMessage, updateConversation,
-      clearPendingQueue]);
+      await runStream({
+        url: `/api/chat/conversations/${convId}/messages/${messageId}`,
+        method: 'PUT',
+        body: { content, model: selectedModel },
+        convId,
+        tempIds: [tempAssistantId],
+        assistantTempId: tempAssistantId,
+      });
+    },
+    [selectedModel, runStream]
+  );
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.();
     setStreaming(false);
     const store = useChatStore.getState();
-    const msgs = store.messages.map((m, i) =>
-      i === store.messages.length - 1 ? { ...m, streaming: false } : m
-    );
-    store.setMessages(msgs);
+    store.messages
+      .filter((m) => m.streaming)
+      .forEach((m) => store.patchMessage(m.id, { streaming: false }));
   }, [setStreaming]);
 
-  return { sendMessage, stopStreaming };
+  return { sendMessage, regenerate, editMessage, stopStreaming };
 }

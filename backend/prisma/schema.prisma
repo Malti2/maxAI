@@ -14,11 +14,12 @@ model User {
   email           String    @unique
   password        String
   name            String?
-  avatarColor     String    @default("#6366f1")
+  avatarColor     String    @default("#0a84ff")
   onboardingDone  Boolean   @default(false)
   defaultModel    String    @default("auto")
   personality     String    @default("assistant")
   chatMode        Boolean   @default(false)
+  soundEnabled    Boolean   @default(true)
   systemPrompt    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -38,6 +39,8 @@ model Conversation {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
+
+  @@index([userId, updatedAt])
 }
 
 model Message {
@@ -47,6 +50,7 @@ model Message {
   model          String?   // which model actually answered
   tokens         Int?      // token count
   reaction       String?   // tapback reaction (e.g. "love", "like") — Chat Mode only
+  edited         Boolean   @default(false) // true once the user edits & resends
   createdAt      DateTime  @default(now())
 
   conversationId String
@@ -56,6 +60,8 @@ model Message {
   replyToId      String?
   replyTo        Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies        Message[] @relation("MessageReplies")
+
+  @@index([conversationId, createdAt])
 }
 
 model RefreshToken {
@@ -66,4 +72,14 @@ model RefreshToken {
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Runtime-editable application settings (key/value). Used by the admin area to
+// override Azure configuration without a redeploy. Secret values are stored
+// encrypted (see lib/crypto.ts).
+model Setting {
+  key       String   @id
+  value     String
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
 }

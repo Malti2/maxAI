@@ -2,17 +2,19 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '../lib/prisma';
+import { env } from '../lib/env';
+import { toPublicUser } from '../lib/serialize';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { asyncHandler } from '../lib/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const RegisterSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(2).optional(),
+  email: z.string().email().max(320),
+  password: z.string().min(8).max(200),
+  name: z.string().min(2).max(80).optional(),
 });
 
 const LoginSchema = z.object({
@@ -21,13 +23,20 @@ const LoginSchema = z.object({
 });
 
 function generateTokens(userId: string) {
-  const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET!, { expiresIn: '15m' });
+  const accessToken = jwt.sign({ userId }, env.JWT_SECRET, {
+    expiresIn: env.ACCESS_TOKEN_TTL,
+  } as jwt.SignOptions);
   const refreshToken = uuidv4();
   return { accessToken, refreshToken };
 }
 
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
-  try {
+function refreshExpiry(): Date {
+  return new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+}
+
+router.post(
+  '/register',
+  asyncHandler(async (req: Request, res: Response) => {
     const data = RegisterSchema.parse(req.body);
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
@@ -38,46 +47,21 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
     const hashed = await bcrypt.hash(data.password, 12);
     const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashed,
-        name: data.name,
-      },
+      data: { email: data.email, password: hashed, name: data.name },
     });
 
     const { accessToken, refreshToken } = generateTokens(user.id);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
     await prisma.refreshToken.create({
-      data: { token: refreshToken, userId: user.id, expiresAt },
+      data: { token: refreshToken, userId: user.id, expiresAt: refreshExpiry() },
     });
 
-    res.status(201).json({
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        onboardingDone: user.onboardingDone,
-        defaultModel: user.defaultModel,
-        personality: user.personality,
-        chatMode: user.chatMode,
-        avatarColor: user.avatarColor,
-      },
-    });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: err.errors[0].message });
-      return;
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
+    res.status(201).json({ accessToken, refreshToken, user: toPublicUser(user) });
+  })
+);
 
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/login',
+  asyncHandler(async (req: Request, res: Response) => {
     const data = LoginSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { email: data.email } });
@@ -93,89 +77,73 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const { accessToken, refreshToken } = generateTokens(user.id);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
     await prisma.refreshToken.create({
-      data: { token: refreshToken, userId: user.id, expiresAt },
+      data: { token: refreshToken, userId: user.id, expiresAt: refreshExpiry() },
     });
 
-    res.json({
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        onboardingDone: user.onboardingDone,
-        defaultModel: user.defaultModel,
-        personality: user.personality,
-        chatMode: user.chatMode,
-        avatarColor: user.avatarColor,
-        systemPrompt: user.systemPrompt,
-      },
+    // Opportunistically clean up this user's expired refresh tokens so the
+    // table doesn't grow without bound.
+    await prisma.refreshToken.deleteMany({
+      where: { userId: user.id, expiresAt: { lt: new Date() } },
     });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: err.errors[0].message });
+
+    res.json({ accessToken, refreshToken, user: toPublicUser(user) });
+  })
+);
+
+router.post(
+  '/refresh',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { refreshToken } = req.body ?? {};
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      res.status(400).json({ error: 'Refresh token missing' });
       return;
     }
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
 
-router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
-  const { refreshToken } = req.body;
-  if (!refreshToken) {
-    res.status(400).json({ error: 'Refresh token missing' });
-    return;
-  }
+    const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+    if (!stored || stored.expiresAt < new Date()) {
+      if (stored) await prisma.refreshToken.delete({ where: { id: stored.id } });
+      res.status(401).json({ error: 'Token expired' });
+      return;
+    }
 
-  const stored = await prisma.refreshToken.findUnique({
-    where: { token: refreshToken },
-    include: { user: true },
-  });
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(stored.userId);
 
-  if (!stored || stored.expiresAt < new Date()) {
-    res.status(401).json({ error: 'Token expired' });
-    return;
-  }
+    // Rotate the refresh token atomically: remove the old one, issue a new one.
+    await prisma.$transaction([
+      prisma.refreshToken.delete({ where: { id: stored.id } }),
+      prisma.refreshToken.create({
+        data: { token: newRefreshToken, userId: stored.userId, expiresAt: refreshExpiry() },
+      }),
+    ]);
 
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(stored.userId);
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    res.json({ accessToken, refreshToken: newRefreshToken });
+  })
+);
 
-  await prisma.refreshToken.delete({ where: { id: stored.id } });
-  await prisma.refreshToken.create({
-    data: { token: newRefreshToken, userId: stored.userId, expiresAt },
-  });
+router.post(
+  '/logout',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { refreshToken } = req.body ?? {};
+    if (refreshToken) {
+      await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+    }
+    res.json({ ok: true });
+  })
+);
 
-  res.json({ accessToken, refreshToken: newRefreshToken });
-});
-
-router.post('/logout', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { refreshToken } = req.body;
-  if (refreshToken) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
-  }
-  res.json({ ok: true });
-});
-
-router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const user = await prisma.user.findUnique({ where: { id: req.userId } });
-  if (!user) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  res.json({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    onboardingDone: user.onboardingDone,
-    defaultModel: user.defaultModel,
-    personality: user.personality,
-    chatMode: user.chatMode,
-    avatarColor: user.avatarColor,
-    systemPrompt: user.systemPrompt,
-  });
-});
+router.get(
+  '/me',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    res.json(toPublicUser(user));
+  })
+);
 
 export default router;

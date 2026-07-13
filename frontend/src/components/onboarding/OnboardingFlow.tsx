@@ -7,8 +7,8 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 
 const AVATAR_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
-  '#f97316', '#eab308', '#10b981', '#3b82f6',
+  '#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f',
+  '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff',
 ];
 
 interface OnboardingFlowProps {
@@ -78,8 +78,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <div className="text-center space-y-4">
             <div
-              className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center shadow-2xl"
-              style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 12px 40px rgba(99,102,241,0.4)' }}
+              className="w-20 h-20 rounded-[24px] mx-auto flex items-center justify-center brand-gradient"
+              style={{ boxShadow: '0 12px 40px rgba(10,132,255,0.4)' }}
             >
               <span className="text-white text-3xl font-bold">M</span>
             </div>
@@ -240,13 +240,13 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               onClick={() => setChatMode(v => !v)}
               className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
               style={{
-                borderColor: chatMode ? '#6366f170' : 'var(--border)',
-                background: chatMode ? '#6366f10a' : 'var(--bg-3)',
+                borderColor: chatMode ? 'var(--accent)' : 'var(--border)',
+                background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)',
               }}
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: chatMode ? '#6366f115' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                style={{ background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
               >
                 <MessageCircle size={17} />
               </div>
@@ -255,7 +255,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                   <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Chat Mode</span>
                   <span
                     className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
-                    style={{ background: chatMode ? '#6366f118' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                    style={{ background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
                   >
                     {chatMode ? 'On' : 'Off'}
                   </span>
@@ -266,7 +266,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               </div>
               <div
                 className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
-                style={{ background: chatMode ? '#6366f1' : 'var(--border-2)' }}
+                style={{ background: chatMode ? '#30d158' : 'var(--border-2)' }}
               >
                 <div
                   className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
@@ -329,18 +329,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'var(--bg)' }}
     >
-      <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
-      <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }} />
+      <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, #0a84ff, transparent)' }} />
+      <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, #5e5ce6, transparent)' }} />
 
       <div
         className="relative w-full max-w-md rounded-3xl overflow-hidden"
         style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
       >
         <div className="h-1" style={{ background: 'var(--bg-3)' }}>
-          <div
-            className="h-full transition-all duration-500"
-            style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #5B5BD6, #7C3AED)' }}
-          />
+          <div className="h-full transition-all duration-500 brand-gradient" style={{ width: `${progress}%` }} />
         </div>
 
         <div className="p-8">
@@ -396,8 +393,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               <button
                 onClick={next}
                 disabled={!canProceed}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
-                style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 brand-gradient"
               >
                 {step === 0 ? "Let's go" : 'Next'}
                 <ArrowRight size={14} />
@@ -406,8 +402,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               <button
                 onClick={handleComplete}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 brand-gradient"
               >
                 {saving ? (
                   <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">

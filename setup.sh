@@ -1,58 +1,147 @@
-#!/bin/bash
-# ============================================
-# maxAI - Setup script for Ubuntu VPS
-# ============================================
-set -e
+#!/usr/bin/env bash
+# ============================================================
+#  maxAI — one-command installer
+#  Installs dependencies, generates secrets, asks for your keys
+#  (or lets you add them later in the admin area) and starts
+#  everything with Docker.
+# ============================================================
+set -euo pipefail
 
-YELLOW='\033[1;33m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
+YELLOW='\033[1;33m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; RED='\033[0;31m'; DIM='\033[2m'; NC='\033[0m'
+info()  { echo -e "${BLUE}➤${NC} $1"; }
+ok()    { echo -e "${GREEN}✓${NC} $1"; }
+warn()  { echo -e "${YELLOW}⚠${NC}  $1"; }
+err()   { echo -e "${RED}✗${NC} $1" >&2; }
+
+cd "$(dirname "$0")"
 
 echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║        maxAI - Setup                 ║${NC}"
-echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
-echo ""
+echo -e "${BLUE}║            maxAI · installer         ║${NC}"
+echo -e "${BLUE}╚══════════════════════════════════════╝${NC}\n"
 
-# Check if .env exists
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}⚠️  No .env file found.${NC}"
-    echo -e "Creating .env from .env.example..."
-    cp .env.example .env
-    echo -e "${RED}➤  Please fill in the .env file before continuing!${NC}"
-    echo -e "   nano .env"
-    exit 1
-fi
+# ── helpers ────────────────────────────────────────────────
+have() { command -v "$1" >/dev/null 2>&1; }
+is_tty() { [ -t 0 ]; }
 
-# Check for Docker
-if ! command -v docker &> /dev/null; then
-    echo -e "${YELLOW}Installing Docker...${NC}"
+gen_secret() {
+  # $1 = number of random bytes
+  if have openssl; then openssl rand -hex "$1"; else
+    head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; fi
+}
+
+read_env() { [ -f .env ] && grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- || true; }
+
+# prompt VAR "Question" "default" [secret]
+prompt() {
+  local __var="$1" __q="$2" __def="${3:-}" __secret="${4:-}" __input=""
+  if ! is_tty; then
+    printf -v "$__var" '%s' "$__def"
+    return
+  fi
+  if [ "$__secret" = "secret" ]; then
+    read -rs -p "$(echo -e "  ${__q} ${DIM}${__def:+[keep existing]}${NC}: ")" __input; echo
+  else
+    read -r -p "$(echo -e "  ${__q}${__def:+ ${DIM}[${__def}]${NC}}: ")" __input
+  fi
+  printf -v "$__var" '%s' "${__input:-$__def}"
+}
+
+# ── 1. Docker ──────────────────────────────────────────────
+if ! have docker; then
+  warn "Docker is not installed."
+  if is_tty; then
+    read -r -p "  Install Docker now? [Y/n]: " yn; yn=${yn:-Y}
+  else yn=Y; fi
+  if [[ "$yn" =~ ^[Yy] ]]; then
+    info "Installing Docker…"
     curl -fsSL https://get.docker.com | sh
-    systemctl enable docker
-    systemctl start docker
+    (systemctl enable --now docker 2>/dev/null || true)
+  else
+    err "Docker is required. Aborting."; exit 1
+  fi
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  err "Docker Compose plugin not found. Install it and re-run."; exit 1
+fi
+ok "Docker is available"
+
+# ── 2. Secrets (generated once, preserved on re-runs) ──────
+POSTGRES_PASSWORD="$(read_env POSTGRES_PASSWORD)"; POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(gen_secret 24)}"
+JWT_SECRET="$(read_env JWT_SECRET)";               JWT_SECRET="${JWT_SECRET:-$(gen_secret 64)}"
+ENCRYPTION_KEY="$(read_env ENCRYPTION_KEY)";        ENCRYPTION_KEY="${ENCRYPTION_KEY:-$(gen_secret 32)}"
+ok "Secrets generated"
+
+# ── 3. Interactive configuration ───────────────────────────
+echo -e "\n${BLUE}Basic settings${NC}"
+PORT_DEF="$(read_env PORT)"; PORT_DEF="${PORT_DEF:-80}"
+prompt PORT "Public HTTP port" "$PORT_DEF"
+URL_DEF="$(read_env FRONTEND_URL)"; URL_DEF="${URL_DEF:-http://localhost}"
+prompt FRONTEND_URL "Public URL / domain" "$URL_DEF"
+
+echo -e "\n${BLUE}Admin account${NC} ${DIM}(only this email can access the admin area)${NC}"
+ADMIN_EMAIL_DEF="$(read_env ADMIN_EMAIL)"
+prompt ADMIN_EMAIL "Admin email" "$ADMIN_EMAIL_DEF"
+ADMIN_PASSWORD="$(read_env ADMIN_PASSWORD)"
+if [ -z "$ADMIN_PASSWORD" ]; then
+  prompt ADMIN_PASSWORD "Admin password (blank = generate)" "" secret
+  if [ -z "$ADMIN_PASSWORD" ]; then ADMIN_PASSWORD="$(gen_secret 9)"; GENERATED_PW=1; fi
 fi
 
-# Check for Docker Compose
-if ! docker compose version &> /dev/null; then
-    echo -e "${YELLOW}Installing Docker Compose...${NC}"
-    apt-get install -y docker-compose-plugin
-fi
+echo -e "\n${BLUE}Azure OpenAI${NC} ${DIM}(leave blank to skip — you can add keys later in Settings → Admin)${NC}"
+AZURE_ENDPOINT="$(read_env AZURE_ENDPOINT)"
+prompt AZURE_ENDPOINT "Azure endpoint URL" "$AZURE_ENDPOINT"
+AZURE_API_KEY="$(read_env AZURE_API_KEY)"
+prompt AZURE_API_KEY "Azure API key" "$AZURE_API_KEY" secret
+DL="$(read_env AZURE_DEPLOYMENT_LITE)";  prompt AZURE_DEPLOYMENT_LITE  "Deployment · Lite"  "${DL:-gpt-4o-mini}"
+DP="$(read_env AZURE_DEPLOYMENT_PRO)";   prompt AZURE_DEPLOYMENT_PRO   "Deployment · Pro"   "${DP:-gpt-4o}"
+DB="$(read_env AZURE_DEPLOYMENT_BEAST)"; prompt AZURE_DEPLOYMENT_BEAST "Deployment · Beast" "${DB:-gpt-4o}"
 
-echo -e "${GREEN}✓ Docker is available${NC}"
+# ── 4. Write .env ──────────────────────────────────────────
+info "Writing .env"
+umask 077
+cat > .env <<EOF
+# Generated by setup.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
+POSTGRES_DB=maxai
+POSTGRES_USER=maxai
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
-# Build & start
-echo -e "\n${BLUE}🔨 Building containers...${NC}"
-docker compose build
+NODE_ENV=production
+PORT=${PORT}
+FRONTEND_URL=${FRONTEND_URL}
+JWT_SECRET=${JWT_SECRET}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+ACCESS_TOKEN_TTL=15m
+REFRESH_TOKEN_TTL_DAYS=30
 
-echo -e "\n${BLUE}🚀 Starting containers...${NC}"
-docker compose up -d
+# Admin (only this account can open the admin area; created on first boot)
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+
+# Azure OpenAI (editable later in Settings → Admin)
+AZURE_ENDPOINT=${AZURE_ENDPOINT}
+AZURE_API_KEY=${AZURE_API_KEY}
+AZURE_API_VERSION=2024-08-01-preview
+AZURE_DEPLOYMENT_LITE=${AZURE_DEPLOYMENT_LITE}
+AZURE_DEPLOYMENT_PRO=${AZURE_DEPLOYMENT_PRO}
+AZURE_DEPLOYMENT_BEAST=${AZURE_DEPLOYMENT_BEAST}
+EOF
+ok ".env written"
+
+# ── 5. Build & start ───────────────────────────────────────
+info "Building and starting containers (this can take a few minutes)…"
+docker compose up -d --build
 
 echo -e "\n${GREEN}✅ maxAI is running!${NC}"
-echo -e "   Open http://$(hostname -I | awk '{print $1}') in your browser"
-echo ""
-echo -e "Useful commands:"
-echo -e "  ${YELLOW}docker compose logs -f${NC}        - Show logs"
-echo -e "  ${YELLOW}docker compose restart${NC}         - Restart"
-echo -e "  ${YELLOW}docker compose down${NC}            - Stop"
-echo -e "  ${YELLOW}docker compose pull && docker compose up -d${NC} - Update"
+HOSTIP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+echo -e "   Open: ${BLUE}${FRONTEND_URL}${NC}  ${DIM}(or http://${HOSTIP:-localhost}:${PORT})${NC}"
+echo -e "\n   Admin login:"
+echo -e "     email:    ${YELLOW}${ADMIN_EMAIL:-<not set>}${NC}"
+if [ "${GENERATED_PW:-0}" = "1" ]; then
+  echo -e "     password: ${YELLOW}${ADMIN_PASSWORD}${NC}  ${DIM}(auto-generated — save it now)${NC}"
+else
+  echo -e "     password: ${DIM}(the one you entered)${NC}"
+fi
+if [ -z "${AZURE_API_KEY}" ]; then
+  echo -e "\n   ${YELLOW}No Azure key set yet.${NC} Sign in and add it under ${BLUE}Settings → Admin${NC}."
+fi
+echo -e "\n   ${DIM}Logs:${NC} docker compose logs -f   ${DIM}·${NC}   ${DIM}Stop:${NC} docker compose down   ${DIM}·${NC}   ${DIM}Update:${NC} git pull && docker compose up -d --build"

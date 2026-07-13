@@ -28,71 +28,44 @@ export const AuthPage: React.FC = () => {
       setAuth(data.user, data.accessToken, data.refreshToken);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'An error occurred');
+      setError(msg || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const fieldStyle = { background: 'var(--bg)', border: '1px solid var(--border-2)', color: 'var(--text-1)' };
+  const focusOn = (e: React.FocusEvent<HTMLElement>) => (e.currentTarget.style.borderColor = 'var(--accent)');
+  const focusOff = (e: React.FocusEvent<HTMLElement>) => (e.currentTarget.style.borderColor = 'var(--border-2)');
+
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{ background: 'var(--bg)' }}
-    >
-      {/* Background blobs */}
-      <div
-        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none opacity-30 dark:opacity-20"
-        style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }}
-      />
-      <div
-        className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] rounded-full blur-3xl pointer-events-none opacity-20 dark:opacity-10"
-        style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }}
-      />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: 'var(--bg)' }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[520px] h-[520px] rounded-full blur-3xl pointer-events-none opacity-25 dark:opacity-20" style={{ background: 'radial-gradient(circle, #0a84ff, transparent)' }} />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[440px] h-[440px] rounded-full blur-3xl pointer-events-none opacity-20 dark:opacity-15" style={{ background: 'radial-gradient(circle, #5e5ce6, transparent)' }} />
 
       <div className="relative w-full max-w-[400px]">
-        {/* Brand */}
         <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-xl"
-            style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 8px 32px rgba(99,102,241,0.35)' }}
-          >
-            <span className="text-white text-xl font-bold">M</span>
+          <div className="w-16 h-16 rounded-[20px] mx-auto mb-4 flex items-center justify-center brand-gradient" style={{ boxShadow: '0 12px 40px rgba(10,132,255,0.4)' }}>
+            <span className="text-white text-2xl font-bold">M</span>
           </div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
-            Welcome to maxAI
+          <h1 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--text-1)' }}>
+            {mode === 'login' ? 'Welcome back' : 'Create your account'}
           </h1>
           <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
-            Your personal AI assistant
+            {mode === 'login' ? 'Sign in to continue to maxAI' : 'Join maxAI and meet Max'}
           </p>
         </div>
 
-        {/* Card */}
-        <div
-          className="rounded-3xl p-6"
-          style={{
-            background: 'var(--bg-2)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-xl)',
-          }}
-        >
-          {/* Tab switcher */}
-          <div
-            className="flex p-1 rounded-2xl mb-6"
-            style={{ background: 'var(--bg-3)' }}
-          >
-            {(['login', 'register'] as Mode[]).map(m => (
+        <div className="rounded-3xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}>
+          <div className="flex p-1 rounded-2xl mb-6" style={{ background: 'var(--bg-3)' }}>
+            {(['login', 'register'] as Mode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setError(''); }}
                 className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
-                style={mode === m ? {
-                  background: 'var(--bg)',
-                  color: 'var(--text-1)',
-                  boxShadow: 'var(--shadow-sm)',
-                } : {
-                  color: 'var(--text-3)',
-                  background: 'transparent',
-                }}
+                style={mode === m
+                  ? { background: 'var(--bg)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }
+                  : { color: 'var(--text-3)', background: 'transparent' }}
               >
                 {m === 'login' ? 'Sign in' : 'Sign up'}
               </button>
@@ -102,92 +75,51 @@ export const AuthPage: React.FC = () => {
           <AnimatePresence mode="wait">
             <motion.form
               key={mode}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}
-              onSubmit={handleSubmit}
-              className="space-y-3.5"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }} onSubmit={handleSubmit} className="space-y-3.5"
             >
               {mode === 'register' && (
                 <div className="relative">
-                  <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
                   <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Your name"
-                    autoFocus
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
-                    style={{
-                      background: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-1)',
-                    }}
-                    onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
-                    onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                    type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoFocus
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl text-sm focus:outline-none transition-colors" style={fieldStyle}
+                    onFocus={focusOn} onBlur={focusOff}
                   />
                 </div>
               )}
 
               <div className="relative">
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  required
-                  autoFocus={mode === 'login'}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
-                  style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-1)',
-                  }}
-                  onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
-                  onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                  type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com"
+                  required autoFocus={mode === 'login'}
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl text-sm focus:outline-none transition-colors" style={fieldStyle}
+                  onFocus={focusOn} onBlur={focusOff}
                 />
               </div>
 
               <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Password"
-                  required
-                  className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
-                  style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-1)',
-                  }}
-                  onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
-                  onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+                  type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder={mode === 'register' ? 'Password (min. 8 characters)' : 'Password'} required
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl text-sm focus:outline-none transition-colors" style={fieldStyle}
+                  onFocus={focusOn} onBlur={focusOff}
                 />
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: 'var(--text-3)' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'}
+                  type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
 
               <AnimatePresence>
                 {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-3.5 py-2.5 rounded-xl text-sm text-red-500" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <div className="px-3.5 py-2.5 rounded-xl text-sm" style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', color: '#ff3b30' }}>
                       {error}
                     </div>
                   </motion.div>
@@ -195,10 +127,9 @@ export const AuthPage: React.FC = () => {
               </AnimatePresence>
 
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 rounded-2xl text-sm font-semibold text-white transition-all mt-1 disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)', boxShadow: '0 2px 12px rgba(99,102,241,0.3)' }}
+                type="submit" disabled={loading}
+                className="w-full py-3 rounded-2xl text-sm font-semibold text-white transition-all mt-1 disabled:opacity-50 brand-gradient"
+                style={{ boxShadow: '0 4px 16px rgba(10,132,255,0.3)' }}
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -208,9 +139,7 @@ export const AuthPage: React.FC = () => {
                     </svg>
                     Just a moment…
                   </span>
-                ) : (
-                  mode === 'login' ? 'Sign in' : 'Create account'
-                )}
+                ) : (mode === 'login' ? 'Sign in' : 'Create account')}
               </button>
             </motion.form>
           </AnimatePresence>
@@ -219,26 +148,12 @@ export const AuthPage: React.FC = () => {
         <p className="text-center text-sm mt-4" style={{ color: 'var(--text-3)' }}>
           {mode === 'login' ? "Don't have an account?" : 'Already registered?'}{' '}
           <button
-            onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(''); }}
-            className="font-medium transition-colors"
-            style={{ color: 'var(--accent)' }}
+            onClick={() => { setMode((m) => (m === 'login' ? 'register' : 'login')); setError(''); }}
+            className="font-semibold transition-colors" style={{ color: 'var(--accent)' }}
           >
-            {mode === 'login' ? 'Sign up now' : 'Sign in'}
+            {mode === 'login' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
-
-        {/* Feature pills */}
-        <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
-          {['Max Lite', 'Max Pro', 'Max Beast', 'Auto'].map((f) => (
-            <span
-              key={f}
-              className="text-[11px] px-2.5 py-1 rounded-full font-medium"
-              style={{ background: 'var(--bg-2)', color: 'var(--text-3)', border: '1px solid var(--border)' }}
-            >
-              {f}
-            </span>
-          ))}
-        </div>
       </div>
     </div>
   );

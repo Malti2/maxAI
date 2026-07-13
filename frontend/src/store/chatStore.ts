@@ -10,6 +10,7 @@ export interface Message {
   createdAt: string;
   streaming?: boolean;
   pending?: boolean; // shown immediately in UI, waiting to be sent to AI
+  edited?: boolean;
   reaction?: string | null; // tapback reaction (Chat Mode only)
   replyToId?: string | null; // id of the message this one replies to
 }
@@ -21,6 +22,7 @@ export interface Conversation {
   pinned: boolean;
   updatedAt: string;
   createdAt: string;
+  preview?: string;
   messages?: Message[];
 }
 
@@ -40,7 +42,10 @@ interface ChatState {
   setActiveConversation: (id: string | null) => void;
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
-  updateLastMessage: (content: string) => void;
+  updateMessageContent: (id: string, content: string) => void;
+  patchMessage: (id: string, patch: Partial<Message>) => void;
+  removeMessage: (id: string) => void;
+  removeMessagesAfter: (id: string, inclusive?: boolean) => void;
   setMessageReaction: (id: string, reaction: string | null) => void;
   setStreaming: (v: boolean) => void;
   setSelectedModel: (model: ModelId) => void;
@@ -61,25 +66,32 @@ export const useChatStore = create<ChatState>((set) => ({
 
   setConversations: (conversations) => set({ conversations }),
   addConversation: (conv) => set((s) => ({ conversations: [conv, ...s.conversations] })),
-  updateConversation: (id, updates) => set((s) => ({
-    conversations: s.conversations.map(c => c.id === id ? { ...c, ...updates } : c),
-  })),
-  removeConversation: (id) => set((s) => ({
-    conversations: s.conversations.filter(c => c.id !== id),
-    activeConversationId: s.activeConversationId === id ? null : s.activeConversationId,
-    messages: s.activeConversationId === id ? [] : s.messages,
-  })),
+  updateConversation: (id, updates) =>
+    set((s) => ({
+      conversations: s.conversations.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+    })),
+  removeConversation: (id) =>
+    set((s) => ({
+      conversations: s.conversations.filter((c) => c.id !== id),
+      activeConversationId: s.activeConversationId === id ? null : s.activeConversationId,
+      messages: s.activeConversationId === id ? [] : s.messages,
+    })),
   setActiveConversation: (id) => set({ activeConversationId: id }),
   setMessages: (messages) => set({ messages }),
   addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
-  updateLastMessage: (content) => set((s) => ({
-    messages: s.messages.map((m, i) =>
-      i === s.messages.length - 1 ? { ...m, content } : m
-    ),
-  })),
-  setMessageReaction: (id, reaction) => set((s) => ({
-    messages: s.messages.map((m) => (m.id === id ? { ...m, reaction } : m)),
-  })),
+  updateMessageContent: (id, content) =>
+    set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, content } : m)) })),
+  patchMessage: (id, patch) =>
+    set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
+  removeMessage: (id) => set((s) => ({ messages: s.messages.filter((m) => m.id !== id) })),
+  removeMessagesAfter: (id, inclusive = false) =>
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === id);
+      if (idx === -1) return {};
+      return { messages: s.messages.slice(0, inclusive ? idx : idx + 1) };
+    }),
+  setMessageReaction: (id, reaction) =>
+    set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, reaction } : m)) })),
   setStreaming: (isStreaming) => set({ isStreaming }),
   setSelectedModel: (selectedModel) => set({ selectedModel }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),

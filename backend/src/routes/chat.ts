@@ -1,106 +1,165 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { streamChat, selectAutoModel, ModelId } from '../services/azure';
+import { asyncHandler } from '../lib/asyncHandler';
+import { type ModelId } from '../services/azure';
 import { buildSystemPrompt } from '../services/personalities';
 import {
-  AssistantStreamFilter, chatModeInstructions,
-  buildModelHistory, foldReplyContext, type StoredMessage,
+  chatModeInstructions,
+  buildModelHistory,
+  foldReplyContext,
+  type StoredMessage,
+  type ApiMessage,
 } from '../services/chatMode';
+import { streamAssistantTurn } from '../services/chatStream';
 import { REACTION_TYPES } from '../services/reactions';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// List conversations
-router.get('/conversations', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const conversations = await prisma.conversation.findMany({
-    where: { userId: req.userId },
-    orderBy: [{ pinned: 'desc' }, { updatedAt: 'desc' }],
-    include: {
-      messages: {
-        take: 1,
-        orderBy: { createdAt: 'asc' },
+const MODEL_ENUM = z.enum(['lite', 'pro', 'beast', 'auto']);
+const MAX_MESSAGE_LEN = 32000;
+const HISTORY_LIMIT = 50;
+
+// ── Conversations ────────────────────────────────────────────────
+
+// List conversations, each with a short preview of its most recent message.
+router.get(
+  '/conversations',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const conversations = await prisma.conversation.findMany({
+      where: { userId: req.userId },
+      orderBy: [{ pinned: 'desc' }, { updatedAt: 'desc' }],
+      include: {
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { content: true, role: true },
+        },
       },
-    },
-  });
-  res.json(conversations);
-});
+    });
 
-// Get single conversation with messages
-router.get('/conversations/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const conv = await prisma.conversation.findFirst({
-    where: { id: req.params.id, userId: req.userId },
-    include: {
-      messages: { orderBy: { createdAt: 'asc' } },
-    },
-  });
-  if (!conv) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  res.json(conv);
-});
+    type ConvRow = Record<string, unknown> & {
+      messages: Array<{ content: string; role: string }>;
+    };
+    const shaped = (conversations as ConvRow[]).map((c) => {
+      const last = c.messages[0];
+      const preview = last ? last.content.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      const { messages: _messages, ...rest } = c;
+      return { ...rest, preview };
+    });
 
-// Create conversation
-router.post('/conversations', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { model } = req.body;
-  const conv = await prisma.conversation.create({
-    data: {
-      userId: req.userId!,
-      model: model || 'auto',
-    },
-  });
-  res.status(201).json(conv);
-});
+    res.json(shaped);
+  })
+);
 
-// Update conversation (title, pin, model)
-router.patch('/conversations/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, pinned, model } = req.body;
-  const conv = await prisma.conversation.updateMany({
-    where: { id: req.params.id, userId: req.userId },
-    data: { title, pinned, model },
-  });
-  if (conv.count === 0) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  const updated = await prisma.conversation.findUnique({ where: { id: req.params.id } });
-  res.json(updated);
-});
+// Get single conversation with messages.
+router.get(
+  '/conversations/:id',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const conv = await prisma.conversation.findFirst({
+      where: { id: req.params.id, userId: req.userId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!conv) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    res.json(conv);
+  })
+);
 
-// Delete conversation
-router.delete('/conversations/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  await prisma.conversation.deleteMany({
-    where: { id: req.params.id, userId: req.userId },
-  });
-  res.json({ ok: true });
-});
+// Create conversation.
+router.post(
+  '/conversations',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const model = MODEL_ENUM.catch('auto').parse(req.body?.model);
+    const conv = await prisma.conversation.create({
+      data: { userId: req.userId!, model },
+    });
+    res.status(201).json(conv);
+  })
+);
 
-// Delete all conversations
-router.delete('/conversations', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  await prisma.conversation.deleteMany({ where: { userId: req.userId } });
-  res.json({ ok: true });
-});
+// Update conversation (title, pin, model).
+const UpdateConvSchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    pinned: z.boolean().optional(),
+    model: MODEL_ENUM.optional(),
+  })
+  .strict();
 
-// Toggle pin
-router.post('/conversations/:id/pin', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const conv = await prisma.conversation.findFirst({
-    where: { id: req.params.id, userId: req.userId },
-  });
-  if (!conv) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  const updated = await prisma.conversation.update({
-    where: { id: req.params.id },
-    data: { pinned: !conv.pinned },
-  });
-  res.json(updated);
-});
+router.patch(
+  '/conversations/:id',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = UpdateConvSchema.parse(req.body);
+    const conv = await prisma.conversation.updateMany({
+      where: { id: req.params.id, userId: req.userId },
+      data,
+    });
+    if (conv.count === 0) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    const updated = await prisma.conversation.findUnique({ where: { id: req.params.id } });
+    res.json(updated);
+  })
+);
 
-// Add / change / remove a tapback reaction on a message (Chat Mode only).
+// Delete all conversations. (Declared before the :id route so "conversations"
+// is never captured as an id.)
+router.delete(
+  '/conversations',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    await prisma.conversation.deleteMany({ where: { userId: req.userId } });
+    res.json({ ok: true });
+  })
+);
+
+// Delete a single conversation.
+router.delete(
+  '/conversations/:id',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await prisma.conversation.deleteMany({
+      where: { id: req.params.id, userId: req.userId },
+    });
+    if (result.count === 0) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    res.json({ ok: true });
+  })
+);
+
+// Toggle pin.
+router.post(
+  '/conversations/:id/pin',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const conv = await prisma.conversation.findFirst({
+      where: { id: req.params.id, userId: req.userId },
+    });
+    if (!conv) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    const updated = await prisma.conversation.update({
+      where: { id: req.params.id },
+      data: { pinned: !conv.pinned },
+    });
+    res.json(updated);
+  })
+);
+
+// ── Reactions (tapbacks) ─────────────────────────────────────────
+
 const ReactionSchema = z.object({
   reaction: z.enum(REACTION_TYPES as [string, ...string[]]).nullable(),
 });
@@ -108,60 +167,123 @@ const ReactionSchema = z.object({
 router.put(
   '/conversations/:id/messages/:messageId/reaction',
   authenticate,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-      const { reaction } = ReactionSchema.parse(req.body);
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { reaction } = ReactionSchema.parse(req.body);
 
-      const user = await prisma.user.findUnique({ where: { id: req.userId } });
-      if (!user?.chatMode) {
-        res.status(403).json({ error: 'Chat Mode is disabled' });
-        return;
-      }
-
-      // Ensure the message belongs to a conversation owned by this user.
-      const message = await prisma.message.findFirst({
-        where: {
-          id: req.params.messageId,
-          conversation: { id: req.params.id, userId: req.userId },
-        },
-      });
-      if (!message) {
-        res.status(404).json({ error: 'Not found' });
-        return;
-      }
-
-      const updated = await prisma.message.update({
-        where: { id: message.id },
-        data: { reaction },
-      });
-      res.json(updated);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        res.status(400).json({ error: err.errors[0].message });
-        return;
-      }
-      res.status(500).json({ error: 'Internal error' });
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user?.chatMode) {
+      res.status(403).json({ error: 'Chat Mode is disabled' });
+      return;
     }
-  }
+
+    const message = await prisma.message.findFirst({
+      where: {
+        id: req.params.messageId,
+        conversation: { id: req.params.id, userId: req.userId },
+      },
+    });
+    if (!message) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: message.id },
+      data: { reaction },
+    });
+    res.json(updated);
+  })
 );
 
-// Send message + stream response
+// ── SSE helpers ──────────────────────────────────────────────────
+
+function openSSE(req: Request, res: Response): AbortController {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  // Abort the upstream model stream if the client disconnects.
+  const controller = new AbortController();
+  const onClose = () => controller.abort();
+  req.on('close', onClose);
+  res.on('finish', () => req.off('close', onClose));
+  return controller;
+}
+
+function sse(res: Response, payload: unknown): void {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+async function touchConversation(id: string): Promise<void> {
+  await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
+}
+
+// Run one assistant turn over the already-open SSE stream and always finish the
+// response cleanly — emitting a `done` event on success or an `error` event if
+// the model call fails after streaming has begun.
+interface FinishTurnOptions {
+  conversationId: string;
+  history: ApiMessage[];
+  systemPrompt: string;
+  requestedModel: ModelId;
+  chatMode: boolean;
+  reactionTargetId: string | null;
+  signal: AbortSignal;
+  titleSeed?: string; // when set (first message), name the conversation from it
+}
+
+async function finishTurn(res: Response, opts: FinishTurnOptions): Promise<void> {
+  try {
+    const { assistantMessage, aborted } = await streamAssistantTurn({
+      res,
+      conversationId: opts.conversationId,
+      history: opts.history,
+      systemPrompt: opts.systemPrompt,
+      requestedModel: opts.requestedModel,
+      chatMode: opts.chatMode,
+      reactionTargetId: opts.reactionTargetId,
+      signal: opts.signal,
+    });
+
+    if (opts.titleSeed !== undefined) {
+      const title = opts.titleSeed.slice(0, 60) + (opts.titleSeed.length > 60 ? '…' : '');
+      await prisma.conversation.update({
+        where: { id: opts.conversationId },
+        data: { title, updatedAt: new Date() },
+      });
+    } else {
+      await touchConversation(opts.conversationId);
+    }
+
+    sse(res, { type: 'done', message: assistantMessage, aborted });
+  } catch (err) {
+    console.error('Assistant turn failed:', err);
+    if (!res.writableEnded) sse(res, { type: 'error', error: 'Max could not respond. Please try again.' });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+}
+
+// ── Send message + stream response ───────────────────────────────
+
 const SendMessageSchema = z.object({
-  content: z.string().min(1),
-  model: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
-  // Chat Mode: additional messages that arrived while Max was responding.
-  pendingMessages: z.array(z.string()).optional(),
-  // Chat Mode: id of the message this one is replying to.
+  content: z.string().min(1).max(MAX_MESSAGE_LEN),
+  model: MODEL_ENUM.optional(),
+  pendingMessages: z.array(z.string().min(1).max(MAX_MESSAGE_LEN)).max(20).optional(),
   replyToId: z.string().optional().nullable(),
 });
 
-router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.post(
+  '/conversations/:id/messages',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const { content, model, pendingMessages, replyToId } = SendMessageSchema.parse(req.body);
 
     const conv = await prisma.conversation.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      include: { messages: { orderBy: { createdAt: 'asc' }, take: 50 } },
+      include: { messages: { orderBy: { createdAt: 'asc' }, take: HISTORY_LIMIT } },
     });
     if (!conv) {
       res.status(404).json({ error: 'Not found' });
@@ -170,168 +292,203 @@ router.post('/conversations/:id/messages', authenticate, async (req: AuthRequest
 
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const chatMode = user?.chatMode ?? false;
-    const selectedModel = (model || conv.model || 'auto') as ModelId;
-
+    const requestedModel = (model || conv.model || 'auto') as ModelId;
     const storedMsgs = conv.messages as StoredMessage[];
+    const isFirstMessage = storedMsgs.length === 0;
 
-    // Reply targeting is a Chat Mode feature; ignore it otherwise. The target
-    // must be an existing message in this conversation.
-    const existingIds = new Set(storedMsgs.map(m => m.id));
+    // Reply targeting is a Chat Mode feature; the target must be an existing
+    // message in this conversation.
+    const existingIds = new Set(storedMsgs.map((m) => m.id));
     const validReplyToId = chatMode && replyToId && existingIds.has(replyToId) ? replyToId : null;
 
-    // Save primary user message.
+    // Persist the primary user message.
     const userMsg = await prisma.message.create({
       data: { conversationId: conv.id, role: 'user', content, replyToId: validReplyToId },
     });
 
-    // Save any pending (queued) messages from Chat Mode.
+    // Persist any Chat Mode queued messages.
     const savedPendingMsgs = [];
     if (chatMode && pendingMessages && pendingMessages.length > 0) {
       for (const pm of pendingMessages) {
-        const msg = await prisma.message.create({
-          data: { conversationId: conv.id, role: 'user', content: pm },
-        });
-        savedPendingMsgs.push(msg);
+        savedPendingMsgs.push(
+          await prisma.message.create({
+            data: { conversationId: conv.id, role: 'user', content: pm },
+          })
+        );
       }
     }
 
-    // Build the message history for the API, with tapback/reply context.
+    // Build the model history with tapback/reply context.
     const history = buildModelHistory(storedMsgs);
-
-    // Add the primary message (folding in reply context if present).
     if (validReplyToId) {
-      const target = storedMsgs.find(m => m.id === validReplyToId)!;
+      const target = storedMsgs.find((m) => m.id === validReplyToId)!;
       history.push({ role: 'user', content: foldReplyContext(target, content) });
     } else {
       history.push({ role: 'user', content });
     }
 
-    // If Chat Mode pending messages exist, add a context note + all of them.
     if (savedPendingMsgs.length > 0) {
       history.push({
         role: 'system',
-        content: `[Chat Mode] The user sent ${savedPendingMsgs.length} additional message${savedPendingMsgs.length > 1 ? 's' : ''} while you were responding. They arrived in order and should be treated as a natural continuation of the conversation — reply to all of them together as you would in a real chat.`,
+        content: `[Chat Mode] The user sent ${savedPendingMsgs.length} additional message${
+          savedPendingMsgs.length > 1 ? 's' : ''
+        } while you were responding. They arrived in order and should be treated as a natural continuation of the conversation — reply to all of them together as you would in a real chat.`,
       });
       for (const pm of savedPendingMsgs) {
         history.push({ role: 'user', content: pm.content });
       }
     }
 
-    // The last user message is the target for any AI tapback / reply.
-    const lastUserMsg = savedPendingMsgs.length > 0
-      ? savedPendingMsgs[savedPendingMsgs.length - 1]
-      : userMsg;
+    const lastUserMsg = savedPendingMsgs.length > 0 ? savedPendingMsgs[savedPendingMsgs.length - 1] : userMsg;
 
-    // Compose the system prompt: personality + user's custom instruction,
-    // plus Chat Mode directives when enabled.
     let systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
-    if (chatMode) {
-      systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
-    }
+    if (chatMode) systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
 
-    // Auto-select model if needed.
-    let resolvedModel = selectedModel;
-    if (selectedModel === 'auto') {
-      resolvedModel = selectAutoModel(history);
-    }
+    const controller = openSSE(req, res);
 
-    // Set up SSE streaming.
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-
-    // Send the persisted user message ids first.
-    res.write(`data: ${JSON.stringify({ type: 'user_message', message: userMsg })}\n\n`);
+    sse(res, { type: 'user_message', message: userMsg });
     if (savedPendingMsgs.length > 0) {
-      res.write(`data: ${JSON.stringify({ type: 'pending_messages', messages: savedPendingMsgs })}\n\n`);
+      sse(res, { type: 'pending_messages', messages: savedPendingMsgs });
     }
-    res.write(`data: ${JSON.stringify({ type: 'model', model: resolvedModel })}\n\n`);
 
-    // Filter strips any Chat Mode control block (tapback / reply directive)
-    // from the visible stream so it never reaches the user.
-    const filter = new AssistantStreamFilter();
-    let visibleContent = '';
-
-    const result = await streamChat(
-      selectedModel,
+    await finishTurn(res, {
+      conversationId: conv.id,
       history,
       systemPrompt,
-      (chunk) => {
-        const visible = chatMode ? filter.push(chunk) : chunk;
-        if (visible) {
-          visibleContent += visible;
-          res.write(`data: ${JSON.stringify({ type: 'delta', content: visible })}\n\n`);
-        }
-      }
-    );
+      requestedModel,
+      chatMode,
+      reactionTargetId: lastUserMsg.id,
+      signal: controller.signal,
+      titleSeed: isFirstMessage ? content : undefined,
+    });
+  })
+);
 
-    // Flush any buffered remainder and read the parsed control directives.
-    if (chatMode) {
-      const tail = filter.end();
-      if (tail) {
-        visibleContent += tail;
-        res.write(`data: ${JSON.stringify({ type: 'delta', content: tail })}\n\n`);
-      }
-    } else {
-      visibleContent = result.content;
+// ── Regenerate the assistant's reply to the latest user turn ──────
+
+const RegenerateSchema = z
+  .object({ model: MODEL_ENUM.optional() })
+  .strict()
+  .optional();
+
+router.post(
+  '/conversations/:id/regenerate',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = RegenerateSchema.parse(req.body) ?? {};
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: req.params.id, userId: req.userId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!conv) {
+      res.status(404).json({ error: 'Not found' });
+      return;
     }
 
-    const control = filter.getControl();
-
-    // Apply an AI-authored tapback to the last user message.
-    let aiReaction: { messageId: string; reaction: string } | null = null;
-    if (chatMode && control.reaction) {
-      await prisma.message.update({
-        where: { id: lastUserMsg.id },
-        data: { reaction: control.reaction },
-      });
-      aiReaction = { messageId: lastUserMsg.id, reaction: control.reaction };
-      res.write(`data: ${JSON.stringify({ type: 'reaction', ...aiReaction })}\n\n`);
+    const msgs = conv.messages as StoredMessage[];
+    const lastUserIdx = [...msgs].map((m) => m.role).lastIndexOf('user');
+    if (lastUserIdx === -1) {
+      res.status(400).json({ error: 'Nothing to regenerate' });
+      return;
     }
 
-    // Persist the assistant message — unless it is a bare tapback (a reaction
-    // with no text), in which case the reaction itself is the reply.
-    let assistantMsg = null;
-    const trimmed = visibleContent.trim();
-    if (trimmed.length > 0) {
-      assistantMsg = await prisma.message.create({
-        data: {
-          conversationId: conv.id,
-          role: 'assistant',
-          content: visibleContent,
-          model: result.model,
-          tokens: result.tokens,
-          replyToId: chatMode && control.isReply ? lastUserMsg.id : null,
-        },
-      });
+    // Drop every message after the last user message (the stale assistant reply)
+    // so we can produce a fresh one from the same context.
+    const toDelete = msgs.slice(lastUserIdx + 1).map((m) => m.id);
+    if (toDelete.length > 0) {
+      await prisma.message.deleteMany({ where: { id: { in: toDelete } } });
     }
 
-    // Auto-generate the title from the first message.
-    if (conv.messages.length === 0) {
-      const title = content.slice(0, 60) + (content.length > 60 ? '…' : '');
-      await prisma.conversation.update({
-        where: { id: conv.id },
-        data: { title, updatedAt: new Date() },
-      });
-    } else {
-      await prisma.conversation.update({
-        where: { id: conv.id },
-        data: { updatedAt: new Date() },
-      });
-    }
+    const kept = msgs.slice(0, lastUserIdx + 1);
+    const history = buildModelHistory(kept.slice(-HISTORY_LIMIT));
+    const lastUserMsg = kept[lastUserIdx];
 
-    res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
-    res.end();
-  } catch (err) {
-    console.error('Stream error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to send message' });
-    } else {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: 'API error' })}\n\n`);
-      res.end();
-    }
-  }
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const chatMode = user?.chatMode ?? false;
+    const requestedModel = (body.model || conv.model || 'auto') as ModelId;
+
+    let systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
+    if (chatMode) systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
+
+    const controller = openSSE(req, res);
+
+    await finishTurn(res, {
+      conversationId: conv.id,
+      history,
+      systemPrompt,
+      requestedModel,
+      chatMode,
+      reactionTargetId: lastUserMsg.id,
+      signal: controller.signal,
+    });
+  })
+);
+
+// ── Edit a user message and re-stream from that point ────────────
+
+const EditMessageSchema = z.object({
+  content: z.string().min(1).max(MAX_MESSAGE_LEN),
+  model: MODEL_ENUM.optional(),
 });
+
+router.put(
+  '/conversations/:id/messages/:messageId',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { content, model } = EditMessageSchema.parse(req.body);
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: req.params.id, userId: req.userId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!conv) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const msgs = conv.messages as StoredMessage[];
+    const idx = msgs.findIndex((m) => m.id === req.params.messageId);
+    if (idx === -1 || msgs[idx].role !== 'user') {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    // Editing a message invalidates everything after it, so drop those messages
+    // and re-generate — exactly like editing a prompt in a chat app.
+    const toDelete = msgs.slice(idx + 1).map((m) => m.id);
+    if (toDelete.length > 0) {
+      await prisma.message.deleteMany({ where: { id: { in: toDelete } } });
+    }
+
+    const editedMsg = await prisma.message.update({
+      where: { id: req.params.messageId },
+      data: { content, edited: true },
+    });
+
+    const kept = [...msgs.slice(0, idx), editedMsg as unknown as StoredMessage];
+    const history = buildModelHistory(kept.slice(-HISTORY_LIMIT));
+
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const chatMode = user?.chatMode ?? false;
+    const requestedModel = (model || conv.model || 'auto') as ModelId;
+
+    let systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
+    if (chatMode) systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
+
+    const controller = openSSE(req, res);
+    sse(res, { type: 'user_message', message: editedMsg });
+
+    await finishTurn(res, {
+      conversationId: conv.id,
+      history,
+      systemPrompt,
+      requestedModel,
+      chatMode,
+      reactionTargetId: editedMsg.id,
+      signal: controller.signal,
+    });
+  })
+);
 
 export default router;

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthPage } from './pages/AuthPage';
@@ -6,8 +6,10 @@ import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AppLayout } from './components/layout/AppLayout';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { Toaster } from './components/ui/Toaster';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore, applyTheme } from './store/themeStore';
+import { setSoundEnabled } from './lib/sounds';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,11 @@ function AppRoutes() {
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
+  // Keep the sound engine in sync with the user's preference.
+  useEffect(() => {
+    setSoundEnabled(user?.soundEnabled ?? true);
+  }, [user?.soundEnabled]);
+
   if (!user) {
     return (
       <Routes>
@@ -32,9 +39,7 @@ function AppRoutes() {
   }
 
   if (!user.onboardingDone) {
-    return (
-      <OnboardingFlow onComplete={() => updateUser({ onboardingDone: true })} />
-    );
+    return <OnboardingFlow onComplete={() => updateUser({ onboardingDone: true })} />;
   }
 
   return (
@@ -55,6 +60,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRoutes />
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   );
