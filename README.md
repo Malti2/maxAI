@@ -21,6 +21,8 @@
 ## What's new in 2.0
 
 - **Redesigned UI** modelled on iMessage: bubbles with tails, tapbacks pinned to corners, a typing bubble, "Delivered", grouped messages and time separators.
+- **One-command install** — `bash setup.sh` installs Docker, generates all secrets, seeds an admin account and starts everything.
+- **Admin area** (Settings → Admin, restricted to `ADMIN_EMAIL`) to set/change the Azure keys per model at runtime, with connection tests. Keys are stored encrypted.
 - **Regenerate** (`POST /api/chat/conversations/:id/regenerate`) and **edit & resend** (`PUT /api/chat/conversations/:id/messages/:messageId`).
 - **Message sounds** — synthesised on the fly (no audio assets), toggleable per user.
 - **Production hardening** — a single shared Prisma client, validated environment, a global error handler, request logging, graceful shutdown, SSE abort-on-disconnect, stricter input validation, and DB indexes.
@@ -50,19 +52,38 @@ Tapbacks and replies are only available while Chat Mode is enabled.
 
 ## Quick start (VPS)
 
-### 1. Prerequisites
+The installer does everything for you — it installs Docker if needed, generates
+all secrets, asks for an admin account and (optionally) your Azure keys, then
+builds and starts the stack.
 
 ```bash
-# Install Docker (if not already present)
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker && systemctl start docker
+git clone https://github.com/Malti2/maxAI.git
+cd maxAI
+bash setup.sh
 ```
 
-### 2. Configuration
+That's it. Open the printed URL and sign in with the admin account you chose.
+
+> [!TIP]
+> You can leave the Azure keys blank during setup and add them later in the
+> browser under **Settings → Admin** — no redeploy needed.
+
+### Admin area
+
+Only the account whose email matches `ADMIN_EMAIL` can open the admin area
+(**Settings → Admin**). There you can set and change the Azure endpoint, API key
+and deployment name per model, and test connectivity. API keys are stored
+**encrypted** in the database and are never shown again. The admin account is
+created automatically on first boot from `ADMIN_EMAIL` + `ADMIN_PASSWORD`, so
+nobody else can claim that email.
+
+<details>
+<summary>Manual configuration (optional)</summary>
 
 ```bash
 cp .env.example .env
-nano .env  # enter Azure API keys and secrets
+nano .env        # secrets, ADMIN_EMAIL/ADMIN_PASSWORD, (optional) Azure keys
+docker compose up -d --build
 ```
 
 **Important variables in `.env`:**
@@ -71,36 +92,29 @@ nano .env  # enter Azure API keys and secrets
 |----------|-------------|
 | `POSTGRES_PASSWORD` | Secure database password |
 | `JWT_SECRET` | Random key (`openssl rand -hex 64`) |
-| `AZURE_ENDPOINT` | Azure OpenAI endpoint URL |
-| `AZURE_API_KEY` | Azure API key |
-| `AZURE_DEPLOYMENT_LITE` | Deployment name for Max Lite (e.g. `gpt-4o-mini`) |
-| `AZURE_DEPLOYMENT_PRO` | Deployment name for Max Pro (e.g. `gpt-4o`) |
-| `AZURE_DEPLOYMENT_BEAST` | Deployment name for Max Beast |
+| `ENCRYPTION_KEY` | Optional; encrypts admin-set keys (derived from `JWT_SECRET` if unset) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | The single admin account, seeded on first boot |
+| `AZURE_ENDPOINT` / `AZURE_API_KEY` | Azure OpenAI endpoint + key (or set them in the admin area) |
+| `AZURE_DEPLOYMENT_LITE/PRO/BEAST` | Deployment names per model |
 
-### 3. Start
-
-```bash
-bash setup.sh
-# or manually:
-docker compose up -d
-```
+</details>
 
 ## Architecture
 
 ```
 ├── frontend/        React + TypeScript + Tailwind CSS (Vite)
 │   └── src/
-│       ├── components/  chat/ (bubbles, input, tapbacks), layout/, ui/ (toaster, shortcuts…)
+│       ├── components/  chat/, layout/, ui/, admin/ (AdminPanel)
 │       ├── hooks/       useChat.ts (shared SSE send/regenerate/edit)
 │       ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts, sounds.ts
 │       └── store/       auth, chat, theme, toast (Zustand)
 ├── backend/         Node.js + Express + TypeScript
 │   ├── src/
-│   │   ├── lib/       prisma.ts (singleton), env.ts (validation), serialize.ts, asyncHandler.ts
-│   │   ├── middleware/ auth.ts, error.ts (logger + 404 + error handler)
-│   │   ├── routes/    auth.ts, chat.ts, settings.ts
-│   │   └── services/  azure.ts (OpenAI streaming), personalities.ts, chatMode.ts,
-│   │                  chatStream.ts (shared assistant turn), reactions.ts
+│   │   ├── lib/       prisma.ts, env.ts, crypto.ts, serialize.ts, bootstrap.ts, asyncHandler.ts
+│   │   ├── middleware/ auth.ts, admin.ts, error.ts
+│   │   ├── routes/    auth.ts, chat.ts, settings.ts, admin.ts
+│   │   └── services/  azure.ts, config.ts (runtime Azure config), personalities.ts,
+│   │                  chatMode.ts, chatStream.ts, reactions.ts
 │   └── prisma/        schema.prisma + migrations/
 ├── nginx/           reverse proxy configuration
 └── docker-compose.yml

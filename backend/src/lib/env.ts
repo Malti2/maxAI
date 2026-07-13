@@ -11,6 +11,9 @@ interface Env {
   FRONTEND_URL: string;
   ACCESS_TOKEN_TTL: string;
   REFRESH_TOKEN_TTL_DAYS: number;
+  ADMIN_EMAIL: string; // the single account allowed into the admin area ('' = none)
+  ADMIN_PASSWORD: string; // used only to seed the admin account on first boot
+  ENCRYPTION_KEY: string; // optional; falls back to a key derived from JWT_SECRET
 }
 
 function required(name: string): string {
@@ -49,6 +52,9 @@ export function loadEnv(): Env {
     FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:5173'),
     ACCESS_TOKEN_TTL: optional('ACCESS_TOKEN_TTL', '15m'),
     REFRESH_TOKEN_TTL_DAYS: Number(optional('REFRESH_TOKEN_TTL_DAYS', '30')),
+    ADMIN_EMAIL: optional('ADMIN_EMAIL', '').trim().toLowerCase(),
+    ADMIN_PASSWORD: optional('ADMIN_PASSWORD', ''),
+    ENCRYPTION_KEY: optional('ENCRYPTION_KEY', ''),
   };
 
   return cached;
@@ -59,3 +65,11 @@ export const env = new Proxy({} as Env, {
     return loadEnv()[prop as keyof Env];
   },
 });
+
+// Whether the given email is the designated admin. Admin access is controlled
+// purely by ADMIN_EMAIL, so it cannot be granted by tampering with the database.
+export function isAdminEmail(email?: string | null): boolean {
+  const admin = loadEnv().ADMIN_EMAIL;
+  if (!admin || !email) return false;
+  return email.trim().toLowerCase() === admin;
+}

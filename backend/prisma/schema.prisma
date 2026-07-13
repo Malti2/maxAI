@@ -73,3 +73,13 @@ model RefreshToken {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// Runtime-editable application settings (key/value). Used by the admin area to
+// override Azure configuration without a redeploy. Secret values are stored
+// encrypted (see lib/crypto.ts).
+model Setting {
+  key       String   @id
+  value     String
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}

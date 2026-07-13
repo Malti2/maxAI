@@ -3,10 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import { loadEnv } from './lib/env';
 import { prisma } from './lib/prisma';
+import { ensureAdminUser } from './lib/bootstrap';
 import { requestLogger, notFound, errorHandler } from './middleware/error';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import settingsRouter from './routes/settings';
+import adminRouter from './routes/admin';
 
 // Fail fast with a clear message if the environment is misconfigured.
 const env = loadEnv();
@@ -43,6 +45,7 @@ app.get('/health', (_req, res) =>
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/admin', adminRouter);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -50,6 +53,9 @@ app.use(errorHandler);
 const server = app.listen(env.PORT, () => {
   console.log(`🚀 maxAI backend running on port ${env.PORT} (${env.NODE_ENV})`);
 });
+
+// Seed the admin account once the server is up (non-blocking).
+void ensureAdminUser();
 
 // Graceful shutdown: stop accepting connections, then close the DB pool.
 async function shutdown(signal: string) {

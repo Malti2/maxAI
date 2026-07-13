@@ -187,11 +187,14 @@ zwei Indizes (`Message(conversationId, createdAt)` und
 - ✅ **Backend `npm run build`** (tsc) — sauber
 - ✅ **Frontend `npm run build`** (tsc + vite) — sauber, keine Chunk-Warnung
 - ✅ **`oxlint`** — 0 Fehler, 5 (vorbestehende) Hook-Deps-Hinweise
-- ✅ **`npm test`** (Backend) — **312 Assertions grün**: Stream-Parser (279),
-  `buildModelHistory` (19) und neue Unit-Tests (14) für `selectAutoModel`,
-  `resolveModel` und `toPublicUser`
+- ✅ **`npm test`** (Backend) — **319 Assertions grün**: Stream-Parser (279),
+  `buildModelHistory` (19) und Unit-Tests (21) für `selectAutoModel`,
+  `resolveModel`, `toPublicUser` sowie die Verschlüsselung (`encrypt`/`decrypt`/`mask`)
+- ✅ **Server-Boot-Smoke-Test**: `/health` (ok), `/api/nope` (404),
+  `/api/admin/config` ohne Token (401), fehlerhaftes JSON (400) — Fehler-Handler
+  und Auth-Gate greifen
 - ✅ **Visueller Test** in Headless-Chromium (Light + Dark, Chat, Empty, Auth,
-  Settings, Onboarding) — siehe Screenshots unten
+  Settings, Onboarding, Admin) — siehe Screenshots unten
 
 > [!WARNING]
 > **Sandbox-Einschränkung:** Der Prisma-Engine-Download ist in der Build-Umgebung
@@ -230,6 +233,53 @@ So prüfst du es manuell:
 **Login**
 
 ![Login](images/auth.png)
+
+## Installer & Admin-Bereich
+
+Ein zweiter Teil von 2.0 macht das Selbst-Hosten kinderleicht und die Keys zur
+Laufzeit editierbar.
+
+### Ein-Kommando-Installer
+
+`setup.sh` ist jetzt interaktiv und turnkey: Es installiert Docker (auf Wunsch),
+**generiert alle Secrets** (Postgres-Passwort, `JWT_SECRET`, `ENCRYPTION_KEY`),
+fragt nach Port/Domain, einem **Admin-Konto** und — optional — den Azure-Keys,
+schreibt eine `.env` und startet den Stack. Secrets werden bei erneutem Ausführen
+**bewahrt** (kein versehentliches Rotieren von `JWT_SECRET`, das alle ausloggen
+würde), und Azure-Keys darf man leer lassen und später im Browser eintragen.
+
+### Wie „nur ich" garantiert wird
+
+Admin-Zugriff hängt **ausschließlich** an `ADMIN_EMAIL` in der `.env` — nicht an
+einer Datenbank-Spalte, die man manipulieren könnte:
+
+```ts
+export function isAdminEmail(email?: string | null): boolean {
+  const admin = loadEnv().ADMIN_EMAIL;
+  return !!admin && !!email && email.trim().toLowerCase() === admin;
+}
+```
+
+Damit niemand die Admin-Adresse per offener Registrierung „vorwegnimmt", wird das
+Konto beim ersten Start aus `ADMIN_EMAIL` + `ADMIN_PASSWORD` **angelegt**
+(`ensureAdminUser`). Ein `requireAdmin`-Middleware schützt alle `/api/admin`-Routen.
+
+> [!IMPORTANT]
+> Admin-Status ist rein env-gesteuert. Selbst wer sich Datenbankzugriff
+> verschafft, kann sich damit **keinen** Admin-Zugang verschaffen.
+
+### Keys zur Laufzeit ändern
+
+Die Azure-Konfiguration wird in dieser Reihenfolge aufgelöst: **DB-Einstellung →
+Umgebungsvariable → Default**. Der Admin-Bereich (Einstellungen → Admin)
+schreibt DB-Overrides; API-Keys werden mit **AES-256-GCM verschlüsselt**
+gespeichert (Schlüssel aus `ENCRYPTION_KEY` oder abgeleitet aus `JWT_SECRET`) und
+nie wieder im Klartext ausgegeben — die Oberfläche zeigt nur einen maskierten
+Hinweis wie `••••a1b2`. Ein kleiner Cache (5 s, invalidiert beim Speichern) hält
+das Streaming schnell. Ein „Verbindung testen"-Knopf schickt eine 1-Token-Anfrage
+pro Modell.
+
+![Admin-Bereich](images/admin.png)
 
 ## Alternativen
 

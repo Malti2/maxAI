@@ -12,6 +12,7 @@ export interface User {
   soundEnabled: boolean;
   avatarColor: string;
   systemPrompt: string | null;
+  isAdmin: boolean;
 }
 
 interface AuthState {

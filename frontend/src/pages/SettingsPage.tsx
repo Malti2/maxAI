@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Palette, Brain, Trash2, LogOut, Check,
-  Moon, Sun, Monitor, MessageCircle, Volume2,
+  Moon, Sun, Monitor, MessageCircle, Volume2, ShieldCheck,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
+import { AdminPanel } from '../components/admin/AdminPanel';
 import { MODELS } from '../lib/models';
 import { PERSONALITIES, type PersonalityId } from '../lib/personalities';
 import { useAuthStore } from '../store/authStore';
@@ -20,14 +21,15 @@ const AVATAR_COLORS = [
   '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff',
 ];
 
-type Section = 'profile' | 'appearance' | 'models' | 'data';
+type Section = 'profile' | 'appearance' | 'models' | 'data' | 'admin';
 
-const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void }> = ({ active, onChange }) => {
+const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void; isAdmin: boolean }> = ({ active, onChange, isAdmin }) => {
   const items: { id: Section; label: string; icon: React.ReactNode }[] = [
     { id: 'profile', label: 'Profile', icon: <User size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'models', label: 'AI & Models', icon: <Brain size={16} /> },
     { id: 'data', label: 'Data', icon: <Trash2 size={16} /> },
+    ...(isAdmin ? [{ id: 'admin' as Section, label: 'Admin', icon: <ShieldCheck size={16} /> }] : []),
   ];
   return (
     <nav className="p-2 space-y-0.5">
@@ -335,8 +337,7 @@ export const SettingsPage: React.FC = () => {
 
       case 'data':
         return (
-          <div className="space-y-3">
-            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div className="space-y-3">            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
               <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Delete chat history</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>All conversations and messages will be permanently deleted.</p>
               {!deleteConfirm ? (
@@ -373,6 +374,9 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
         );
+
+      case 'admin':
+        return <AdminPanel />;
     }
   };
 
@@ -392,12 +396,12 @@ export const SettingsPage: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-52 shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}>
-          <SectionNav active={section} onChange={setSection} />
+          <SectionNav active={section} onChange={setSection} isAdmin={!!user?.isAdmin} />
         </div>
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-md">
+          <div className={section === 'admin' ? 'max-w-xl' : 'max-w-md'}>
             <h2 className="text-lg font-bold mb-5 tracking-tight" style={{ color: 'var(--text-1)' }}>
-              {section === 'profile' ? 'Profile' : section === 'appearance' ? 'Appearance' : section === 'models' ? 'AI & Models' : 'Data & Privacy'}
+              {section === 'profile' ? 'Profile' : section === 'appearance' ? 'Appearance' : section === 'models' ? 'AI & Models' : section === 'admin' ? 'Admin' : 'Data & Privacy'}
             </h2>
             {renderSection()}
           </div>

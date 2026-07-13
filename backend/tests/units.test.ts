@@ -1,5 +1,9 @@
+// Ensure env is valid before importing modules that read it lazily.
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'x'.repeat(40);
+
 import { selectAutoModel, resolveModel } from '../src/services/azure';
 import { toPublicUser } from '../src/lib/serialize';
+import { encryptSecret, decryptSecret, maskSecret } from '../src/lib/crypto';
 
 let passed = 0;
 let failed = 0;
@@ -57,10 +61,25 @@ function eq(actual: unknown, expected: unknown, msg: string) {
   eq('password' in pub, false, 'password is never exposed');
   eq(pub.soundEnabled, true, 'soundEnabled included');
   eq(pub.systemPrompt, null, 'systemPrompt included (even when null)');
+  eq(pub.isAdmin, false, 'isAdmin false when ADMIN_EMAIL unset');
   eq(Object.keys(pub).sort(), [
-    'avatarColor', 'chatMode', 'defaultModel', 'email', 'id', 'name',
+    'avatarColor', 'chatMode', 'defaultModel', 'email', 'id', 'isAdmin', 'name',
     'onboardingDone', 'personality', 'soundEnabled', 'systemPrompt',
   ], 'exact public key set');
+}
+
+// ── crypto (encrypt/decrypt/mask) ────────────────────────────────
+{
+  const secret = 'sk-abcdef123456';
+  const enc = encryptSecret(secret);
+  eq(enc.startsWith('v1:'), true, 'ciphertext is versioned');
+  eq(enc.includes(secret), false, 'ciphertext does not contain the plaintext');
+  eq(decryptSecret(enc), secret, 'decrypt round-trips');
+  eq(encryptSecret(secret) !== encryptSecret(secret), true, 'random IV → different ciphertext each time');
+  eq(maskSecret(secret), '••••3456', 'mask shows only the last 4 chars');
+  let threw = false;
+  try { decryptSecret('v1:00:00:00'); } catch { threw = true; }
+  eq(threw, true, 'tampered ciphertext throws');
 }
 
 console.log(`\nunits: ${passed} passed, ${failed} failed`);

@@ -1,51 +1,10 @@
 import OpenAI from 'openai';
+import { getResolvedAzure, type ResolvedModelId, type ResolvedAzureModel } from './config';
 
 export type ModelId = 'lite' | 'pro' | 'beast' | 'auto';
-export type ResolvedModelId = Exclude<ModelId, 'auto'>;
+export type { ResolvedModelId } from './config';
 
-interface ModelConfig {
-  endpoint: string;
-  apiKey: string;
-  deployment: string;
-  apiVersion: string;
-  displayName: string;
-  description: string;
-  temperature: number;
-}
-
-const DEFAULT_API_VERSION = '2024-08-01-preview';
-
-function getModelConfigs(): Record<ResolvedModelId, ModelConfig> {
-  return {
-    lite: {
-      endpoint: process.env.AZURE_ENDPOINT_LITE || process.env.AZURE_ENDPOINT || '',
-      apiKey: process.env.AZURE_API_KEY_LITE || process.env.AZURE_API_KEY || '',
-      deployment: process.env.AZURE_DEPLOYMENT_LITE || 'gpt-4o-mini',
-      apiVersion: process.env.AZURE_API_VERSION || DEFAULT_API_VERSION,
-      displayName: 'Max Lite',
-      description: 'Fast & efficient for everyday tasks',
-      temperature: 0.7,
-    },
-    pro: {
-      endpoint: process.env.AZURE_ENDPOINT_PRO || process.env.AZURE_ENDPOINT || '',
-      apiKey: process.env.AZURE_API_KEY_PRO || process.env.AZURE_API_KEY || '',
-      deployment: process.env.AZURE_DEPLOYMENT_PRO || 'gpt-4o',
-      apiVersion: process.env.AZURE_API_VERSION || DEFAULT_API_VERSION,
-      displayName: 'Max Pro',
-      description: 'Powerful for complex tasks',
-      temperature: 0.7,
-    },
-    beast: {
-      endpoint: process.env.AZURE_ENDPOINT_BEAST || process.env.AZURE_ENDPOINT || '',
-      apiKey: process.env.AZURE_API_KEY_BEAST || process.env.AZURE_API_KEY || '',
-      deployment: process.env.AZURE_DEPLOYMENT_BEAST || 'gpt-4o',
-      apiVersion: process.env.AZURE_API_VERSION || DEFAULT_API_VERSION,
-      displayName: 'Max Beast',
-      description: 'Maximum performance for the most demanding tasks',
-      temperature: 0.8,
-    },
-  };
-}
+const TEMPERATURE: Record<ResolvedModelId, number> = { lite: 0.7, pro: 0.7, beast: 0.8 };
 
 // Auto model selection based on message complexity.
 export function selectAutoModel(messages: Array<{ role: string; content: string }>): ResolvedModelId {
@@ -62,30 +21,26 @@ export function selectAutoModel(messages: Array<{ role: string; content: string 
       content
     );
 
-  if (wordCount > 150 || hasCode || hasComplexTerms) {
-    return 'beast';
-  } else if (wordCount > 40) {
-    return 'pro';
-  }
+  if (wordCount > 150 || hasCode || hasComplexTerms) return 'beast';
+  if (wordCount > 40) return 'pro';
   return 'lite';
 }
 
-// Resolve 'auto' to a concrete model for a given history.
 export function resolveModel(modelId: ModelId, messages: Array<{ role: string; content: string }>): ResolvedModelId {
   return modelId === 'auto' ? selectAutoModel(messages) : modelId;
 }
 
-function createClient(config: ModelConfig): OpenAI {
-  if (!config.endpoint || !config.apiKey) {
+function createClient(mc: ResolvedAzureModel): OpenAI {
+  if (!mc.endpoint || !mc.apiKey) {
     throw new Error(
-      'Azure OpenAI is not configured. Set AZURE_ENDPOINT and AZURE_API_KEY (or the per-model overrides) in your environment.'
+      'Azure OpenAI is not configured. Add your endpoint and API key in the admin area (or the .env file).'
     );
   }
   return new OpenAI({
-    apiKey: config.apiKey,
-    baseURL: `${config.endpoint}/openai/deployments/${config.deployment}`,
-    defaultQuery: { 'api-version': config.apiVersion },
-    defaultHeaders: { 'api-key': config.apiKey },
+    apiKey: mc.apiKey,
+    baseURL: `${mc.endpoint.replace(/\/+$/, '')}/openai/deployments/${mc.deployment}`,
+    defaultQuery: { 'api-version': mc.apiVersion },
+    defaultHeaders: { 'api-key': mc.apiKey },
   });
 }
 
@@ -103,13 +58,12 @@ export async function streamChat(
   signal?: AbortSignal
 ): Promise<StreamResult> {
   const resolvedModel = resolveModel(modelId, messages);
-  const config = getModelConfigs()[resolvedModel];
-  const client = createClient(config);
+  const azure = await getResolvedAzure();
+  const mc = azure.models[resolvedModel];
+  const client = createClient(mc);
 
   const messageList: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [];
-  if (systemPrompt) {
-    messageList.push({ role: 'system', content: systemPrompt });
-  }
+  if (systemPrompt) messageList.push({ role: 'system', content: systemPrompt });
   messageList.push(...messages);
 
   let fullContent = '';
@@ -117,12 +71,11 @@ export async function streamChat(
 
   const stream = await client.chat.completions.create(
     {
-      model: config.deployment,
+      model: mc.deployment,
       messages: messageList,
       stream: true,
-      temperature: config.temperature,
+      temperature: TEMPERATURE[resolvedModel],
       max_tokens: 4096,
-      // Ask Azure to include a final usage chunk so we can record token counts.
       stream_options: { include_usage: true },
     },
     { signal }
@@ -134,10 +87,27 @@ export async function streamChat(
       fullContent += delta;
       onChunk?.(delta);
     }
-    if (chunk.usage) {
-      totalTokens = chunk.usage.total_tokens;
-    }
+    if (chunk.usage) totalTokens = chunk.usage.total_tokens;
   }
 
   return { content: fullContent, model: resolvedModel, tokens: totalTokens };
+}
+
+// Lightweight connectivity check used by the admin area. Sends a 1-token
+// completion and reports success or a clean error message.
+export async function testModel(modelId: ResolvedModelId): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const azure = await getResolvedAzure();
+    const mc = azure.models[modelId];
+    const client = createClient(mc);
+    await client.chat.completions.create({
+      model: mc.deployment,
+      messages: [{ role: 'user', content: 'ping' }],
+      max_tokens: 1,
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = (err as { message?: string })?.message || 'Connection failed';
+    return { ok: false, error: message.slice(0, 200) };
+  }
 }
