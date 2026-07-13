@@ -57,7 +57,7 @@ export const AdminPanel: React.FC = () => {
         models[m] = {
           endpoint: endpoints[m],
           deployment: deployments[m],
-          ...(apiKeys[m].trim() ? { apiKey: apiKeys[m].trim() } : {}),
+          apiKey: apiKeys[m].trim() || (config?.models[m].apiKeySet ? undefined : null),
         };
       }
       const { data } = await api.put('/admin/config', { apiVersion, models });
@@ -165,15 +165,36 @@ export const AdminPanel: React.FC = () => {
                 className="w-full px-3.5 py-2 rounded-xl text-[13px] focus:outline-none"
                 style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
               />
-              <input
-                type="password"
-                value={apiKeys[m]}
-                onChange={(e) => setApiKeys((s) => ({ ...s, [m]: e.target.value }))}
-                placeholder={view?.apiKeySet ? `Key set (${view.apiKeyHint}) — leave blank to keep` : 'API key'}
-                className="w-full px-3.5 py-2 rounded-xl text-[13px] focus:outline-none"
-                style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  type="password"
+                  value={apiKeys[m]}
+                  onChange={(e) => setApiKeys((s) => ({ ...s, [m]: e.target.value }))}
+                  placeholder={view?.apiKeySet ? `Key set (${view.apiKeyHint}) — leave blank to keep` : 'API key'}
+                  className="w-full px-3.5 py-2 rounded-xl text-[13px] focus:outline-none pr-10"
+                  style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
+                  autoComplete="new-password"
+                />
+                {view?.apiKeySet && !apiKeys[m] && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Clear API key for Max ${badge(m).badge}?`)) {
+                        api.put('/admin/config', {
+                          models: { [m]: { apiKey: null } }
+                        }).then(({ data }) => {
+                          hydrate(data);
+                          toast.success('API key cleared.');
+                        }).catch(() => toast.error('Could not clear key.'));
+                      }
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-opacity"
+                    style={{ color: '#ff3b30' }}
+                    title="Clear key"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             {t && t !== 'loading' && (

@@ -245,7 +245,12 @@ export const SettingsPage: React.FC = () => {
             <div>
               <FieldLabel label="Sound" />
               <button
-                onClick={() => { const next = !soundEnabled; setSoundEnabled(next); if (next) { applySoundEnabled(true); playReceive(); } }}
+                onClick={() => {
+                  const next = !soundEnabled;
+                  setSoundEnabled(next);
+                  applySoundEnabled(next);
+                  if (next) playReceive();
+                }}
                 className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
                 style={{ borderColor: soundEnabled ? 'var(--accent)' : 'var(--border)', background: soundEnabled ? 'var(--accent-dim)' : 'var(--bg)' }}
               >

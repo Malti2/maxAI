@@ -178,7 +178,9 @@ export class AssistantStreamFilter {
   }
 
   private stripLeadingBlank(s: string): string {
-    return s.replace(/^\s*\n/, '');
+    // Only strip the first single newline that follows the control block.
+    // If the model sent multiple newlines, keep the rest.
+    return s.replace(/^\n/, '');
   }
 }
 

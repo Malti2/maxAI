@@ -71,7 +71,7 @@ export const ChatPage: React.FC = () => {
       setMessages([]);
     }
     setReplyingTo(null);
-  }, [id]);
+  }, [id, activeConversationId, setActiveConversation, setMessages]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -79,11 +79,11 @@ export const ChatPage: React.FC = () => {
 
   useEffect(() => {
     if (isStreaming) scrollToBottom();
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, scrollToBottom]);
 
   useEffect(() => {
     if (id) scrollToBottom('instant');
-  }, [id]);
+  }, [id, scrollToBottom]);
 
   const handleScroll = () => {
     const el = containerRef.current;

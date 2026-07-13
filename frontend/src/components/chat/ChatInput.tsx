@@ -29,11 +29,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (replyingTo) textareaRef.current?.focus();
   }, [replyingTo]);
 
+  const syncModel = async (model: ModelId) => {
+    const activeId = useChatStore.getState().activeConversationId;
+    if (activeId) {
+      try {
+        await api.patch(`/chat/conversations/${activeId}`, { model });
+        useChatStore.getState().updateConversation(activeId, { model });
+      } catch { /* ignore sync failure */ }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const canSendNow = value.trim() && (!isStreaming || chatModeEnabled);
-      if (canSendNow) onSend();
+      if (canSendNow) {
+        syncModel(selectedModel);
+        onSend();
+      }
     }
     if (e.key === 'Escape' && replyingTo) onCancelReply?.();
   };
@@ -107,7 +120,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 </button>
               ) : (
                 <button
-                  onClick={onSend}
+                  onClick={() => { syncModel(selectedModel); onSend(); }}
                   disabled={!canSend}
                   className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
                   style={canSend ? {

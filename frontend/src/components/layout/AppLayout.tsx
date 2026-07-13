@@ -21,15 +21,17 @@ export const AppLayout: React.FC = () => {
     api.get('/chat/conversations')
       .then(({ data }) => setConversations(data))
       .catch(() => toast.error('Could not load your conversations.'));
+  }, [setConversations]);
 
+  useEffect(() => {
     if (user?.defaultModel) setSelectedModel(user.defaultModel as ModelId);
-  }, []);
+  }, [user?.defaultModel, setSelectedModel]);
 
-  const handleNewChat = () => {
+  const handleNewChat = React.useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
     navigate('/chat');
-  };
+  }, [setActiveConversation, setMessages, navigate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -47,7 +49,7 @@ export const AppLayout: React.FC = () => {
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
+  }, [handleNewChat, setSidebarOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>

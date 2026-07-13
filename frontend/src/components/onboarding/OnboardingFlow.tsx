@@ -22,8 +22,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [selectedModel, setSelectedModel] = useState(user?.defaultModel || 'auto');
   const [selectedColor, setSelectedColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || DEFAULT_PERSONALITY);
-  const [chatMode, setChatMode] = useState<boolean>(false);
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [chatMode, setChatMode] = useState<boolean>(user?.chatMode ?? false);
+  const [systemPrompt, setSystemPrompt] = useState(user?.systemPrompt || '');
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
 

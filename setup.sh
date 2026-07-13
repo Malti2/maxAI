@@ -74,9 +74,9 @@ ok "Secrets generated"
 # ── 3. Interactive configuration ───────────────────────────
 echo -e "\n${BLUE}Basic settings${NC}"
 PORT_DEF="$(read_env PORT)"; PORT_DEF="${PORT_DEF:-80}"
-prompt PORT "Public HTTP port" "$PORT_DEF"
-URL_DEF="$(read_env FRONTEND_URL)"; URL_DEF="${URL_DEF:-http://localhost}"
-prompt FRONTEND_URL "Public URL / domain" "$URL_DEF"
+prompt PORT "Public HTTP port (redirects to 443)" "$PORT_DEF"
+URL_DEF="$(read_env FRONTEND_URL)"; URL_DEF="${URL_DEF:-https://localhost}"
+prompt FRONTEND_URL "Public URL / domain (start with https://)" "$URL_DEF"
 
 echo -e "\n${BLUE}Admin account${NC} ${DIM}(only this email can access the admin area)${NC}"
 ADMIN_EMAIL_DEF="$(read_env ADMIN_EMAIL)"
@@ -128,6 +128,16 @@ EOF
 ok ".env written"
 
 # ── 5. Build & start ───────────────────────────────────────
+if [ ! -f nginx/certs/fullchain.pem ] || [ ! -f nginx/certs/privkey.pem ]; then
+  warn "SSL certificates not found in nginx/certs/."
+  info "Generating self-signed certificates for local development..."
+  mkdir -p nginx/certs
+  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout nginx/certs/privkey.pem -out nginx/certs/fullchain.pem \
+    -subj "/C=DE/ST=State/L=City/O=maxAI/OU=Dev/CN=localhost"
+  ok "Self-signed certificates generated."
+fi
+
 info "Building and starting containers (this can take a few minutes)…"
 docker compose up -d --build
 
