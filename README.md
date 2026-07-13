@@ -1,20 +1,30 @@
 # maxAI 🚀
 
-**maxAI** is the platform. **Max** is the name of the AI — your personal assistant with its own ChatGPT-like interface, powered by Azure OpenAI.
+**maxAI** is the platform. **Max** is the name of the AI — your personal assistant with its own iMessage-inspired interface, powered by Azure OpenAI.
 
 ## Features
 
 - **4 models**: Max Lite ◈, Max Pro ◆, Max Beast ⬡, Auto ✦
 - **3 personalities**: Casual (relaxed & direct), Assistant (balanced), Professional (formal)
+- **iMessage-style design**: real message bubbles with tails for both sides, tapback reactions, replies, typing indicator, delivered receipts, date separators, and optional send/receive sounds — in light & dark
+- **Apple-like polish**: SF-first typography, translucent bars, iOS system colours, subtle spring animations
 - **Chat Mode**: message-by-message chatting with queued messages, tapback reactions and replies
-- **Apple-like design**: rounded corners, glass effects, clean typography
-- **Chat history**: search, pin, delete
-- **Streaming**: responses are rendered in real time
-- **Login + registration**: JWT-based with refresh tokens
+- **Regenerate & edit**: re-roll Max's last answer, or edit one of your messages and continue from there
+- **Chat history**: search, pin, delete, with a Messages-style conversation list (avatar, preview, time)
+- **Streaming**: responses render in real time with live Markdown + syntax highlighting
+- **Keyboard shortcuts**: ⌘K new chat, ⌘B toggle sidebar, ⌘/ shortcut help
+- **Login + registration**: JWT-based with rotating refresh tokens
 - **Onboarding**: step-by-step setup on first login (incl. personality choice)
-- **Settings**: profile, theme (light/dark/system), personality, default model, system instruction
-- **Markdown**: full support incl. code highlighting
+- **Settings**: profile, theme (light/dark/system), sound, personality, default model, system instruction
 - **Auto mode**: automatically picks the right model based on complexity
+
+## What's new in 2.0
+
+- **Redesigned UI** modelled on iMessage: bubbles with tails, tapbacks pinned to corners, a typing bubble, "Delivered", grouped messages and time separators.
+- **Regenerate** (`POST /api/chat/conversations/:id/regenerate`) and **edit & resend** (`PUT /api/chat/conversations/:id/messages/:messageId`).
+- **Message sounds** — synthesised on the fly (no audio assets), toggleable per user.
+- **Production hardening** — a single shared Prisma client, validated environment, a global error handler, request logging, graceful shutdown, SSE abort-on-disconnect, stricter input validation, and DB indexes.
+- **Bug fixes** — streaming now targets the correct message in Chat Mode, conversation titles are only set once, and freshly-registered users get their full profile.
 
 ## Personalities
 
@@ -79,11 +89,18 @@ docker compose up -d
 
 ```
 ├── frontend/        React + TypeScript + Tailwind CSS (Vite)
+│   └── src/
+│       ├── components/  chat/ (bubbles, input, tapbacks), layout/, ui/ (toaster, shortcuts…)
+│       ├── hooks/       useChat.ts (shared SSE send/regenerate/edit)
+│       ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts, sounds.ts
+│       └── store/       auth, chat, theme, toast (Zustand)
 ├── backend/         Node.js + Express + TypeScript
 │   ├── src/
+│   │   ├── lib/       prisma.ts (singleton), env.ts (validation), serialize.ts, asyncHandler.ts
+│   │   ├── middleware/ auth.ts, error.ts (logger + 404 + error handler)
 │   │   ├── routes/    auth.ts, chat.ts, settings.ts
-│   │   ├── services/  azure.ts (OpenAI streaming), personalities.ts (system prompts),
-│   │   │              chatMode.ts (Chat Mode control protocol), reactions.ts (tapbacks)
+│   │   └── services/  azure.ts (OpenAI streaming), personalities.ts, chatMode.ts,
+│   │                  chatStream.ts (shared assistant turn), reactions.ts
 │   └── prisma/        schema.prisma + migrations/
 ├── nginx/           reverse proxy configuration
 └── docker-compose.yml
@@ -106,8 +123,8 @@ npx prisma migrate dev --name your_change
 
 | Model | Color | Use |
 |--------|-------|-----------|
-| Max Lite ◈ | Blue | Short, simple requests |
-| Max Pro ◆ | Violet | Complex tasks |
+| Max Lite ◈ | Cyan | Short, simple requests |
+| Max Pro ◆ | Indigo | Complex tasks |
 | Max Beast ⬡ | Orange | Maximum performance |
 | Max Auto ✦ | Green | Automatic selection |
 

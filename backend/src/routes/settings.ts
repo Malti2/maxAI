@@ -1,47 +1,37 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { asyncHandler } from '../lib/asyncHandler';
+import { toPublicUser } from '../lib/serialize';
 import { PERSONALITY_IDS } from '../services/personalities';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-const UpdateSettingsSchema = z.object({
-  name: z.string().min(2).optional(),
-  defaultModel: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
-  personality: z.enum(PERSONALITY_IDS as [string, ...string[]]).optional(),
-  chatMode: z.boolean().optional(),
-  systemPrompt: z.string().max(2000).optional().nullable(),
-  avatarColor: z.string().optional(),
-  onboardingDone: z.boolean().optional(),
-});
+const UpdateSettingsSchema = z
+  .object({
+    name: z.string().min(2).max(80).optional(),
+    defaultModel: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
+    personality: z.enum(PERSONALITY_IDS as [string, ...string[]]).optional(),
+    chatMode: z.boolean().optional(),
+    soundEnabled: z.boolean().optional(),
+    systemPrompt: z.string().max(2000).optional().nullable(),
+    avatarColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'avatarColor must be a hex colour')
+      .optional(),
+    onboardingDone: z.boolean().optional(),
+  })
+  .strict();
 
-router.put('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
+router.put(
+  '/',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = UpdateSettingsSchema.parse(req.body);
-    const user = await prisma.user.update({
-      where: { id: req.userId },
-      data,
-    });
-    res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      onboardingDone: user.onboardingDone,
-      defaultModel: user.defaultModel,
-      personality: user.personality,
-      chatMode: user.chatMode,
-      avatarColor: user.avatarColor,
-      systemPrompt: user.systemPrompt,
-    });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: err.errors[0].message });
-      return;
-    }
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
+    const user = await prisma.user.update({ where: { id: req.userId }, data });
+    res.json(toPublicUser(user));
+  })
+);
 
 export default router;

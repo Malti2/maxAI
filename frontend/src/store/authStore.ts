@@ -9,6 +9,7 @@ export interface User {
   defaultModel: string;
   personality: string;
   chatMode: boolean;
+  soundEnabled: boolean;
   avatarColor: string;
   systemPrompt: string | null;
 }

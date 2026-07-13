@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Pin, Trash2, Settings, ChevronLeft, Search,
-  MoreHorizontal, PinOff, MessageSquarePlus, Sparkles
+  Pin, Trash2, Settings, PanelLeftClose, PanelLeft, Search,
+  MoreHorizontal, PinOff, SquarePen, MessageSquare,
 } from 'lucide-react';
 import { useChatStore, type Conversation } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 import { Avatar } from '../ui/Avatar';
-import { ModelBadge } from '../ui/ModelBadge';
-import type { ModelId } from '../../lib/models';
 import api from '../../lib/api';
-import { formatDistanceToNow, isToday, isYesterday, subDays, isAfter } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import { isToday, isYesterday, subDays, isAfter } from 'date-fns';
 
 interface SidebarProps {
   onNewChat: () => void;
@@ -30,37 +28,45 @@ function getDateGroup(date: Date): DateGroup {
 const GROUP_LABELS: Record<DateGroup, string> = {
   today: 'Today',
   yesterday: 'Yesterday',
-  week: 'Last 7 days',
-  month: 'Last month',
+  week: 'Previous 7 days',
+  month: 'Previous 30 days',
   older: 'Older',
 };
 
+function shortTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  if (isToday(date)) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (isYesterday(date)) return 'Yesterday';
+  if (isAfter(date, subDays(new Date(), 7))) return date.toLocaleDateString([], { weekday: 'short' });
+  return date.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
-  const { conversations, activeConversationId, setActiveConversation,
-    removeConversation, updateConversation, sidebarOpen, setSidebarOpen } = useChatStore();
+  const {
+    conversations, activeConversationId, setActiveConversation,
+    removeConversation, updateConversation, sidebarOpen, setSidebarOpen,
+  } = useChatStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState<string | null>(null);
 
-  // Close menu on outside click
   useEffect(() => {
     const handler = () => setMenuId(null);
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = conversations.filter(c =>
-    c.title.toLowerCase().includes(search.toLowerCase())
+  const filtered = conversations.filter((c) =>
+    (c.title + ' ' + (c.preview ?? '')).toLowerCase().includes(search.toLowerCase())
   );
 
-  const pinned = filtered.filter(c => c.pinned);
-  const unpinned = filtered.filter(c => !c.pinned);
+  const pinned = filtered.filter((c) => c.pinned);
+  const unpinned = filtered.filter((c) => !c.pinned);
 
-  // Group unpinned by date
   const groups = (['today', 'yesterday', 'week', 'month', 'older'] as DateGroup[]).reduce(
     (acc, g) => {
-      acc[g] = unpinned.filter(c => getDateGroup(new Date(c.updatedAt)) === g);
+      acc[g] = unpinned.filter((c) => getDateGroup(new Date(c.updatedAt)) === g);
       return acc;
     },
     {} as Record<DateGroup, Conversation[]>
@@ -73,74 +79,82 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await api.delete(`/chat/conversations/${id}`);
-    removeConversation(id);
-    if (activeConversationId === id) navigate('/chat');
     setMenuId(null);
+    try {
+      await api.delete(`/chat/conversations/${id}`);
+      removeConversation(id);
+      if (activeConversationId === id) navigate('/chat');
+    } catch {
+      toast.error('Could not delete the conversation.');
+    }
   };
 
   const handlePin = async (e: React.MouseEvent, conv: Conversation) => {
     e.stopPropagation();
-    await api.post(`/chat/conversations/${conv.id}/pin`);
-    updateConversation(conv.id, { pinned: !conv.pinned });
     setMenuId(null);
+    updateConversation(conv.id, { pinned: !conv.pinned });
+    try {
+      await api.post(`/chat/conversations/${conv.id}/pin`);
+    } catch {
+      updateConversation(conv.id, { pinned: conv.pinned });
+      toast.error('Could not update the pin.');
+    }
   };
 
   const ConvItem = ({ conv }: { conv: Conversation }) => {
     const isActive = activeConversationId === conv.id;
     return (
-      <div
-        onClick={() => selectConv(conv.id)}
-        className={`conv-item group ${isActive ? 'active' : ''}`}
-      >
+      <div onClick={() => selectConv(conv.id)} className={`conv-item group ${isActive ? 'active' : ''}`}>
+        <div className="w-9 h-9 rounded-full brand-gradient flex items-center justify-center shrink-0 shadow-sm">
+          <span className="text-white text-[13px] font-bold">M</span>
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            {conv.pinned && <Pin size={9} style={{ color: 'var(--text-3)' }} className="shrink-0" />}
-            <p className="text-[13px] truncate" style={{ color: 'var(--text-1)', fontWeight: isActive ? 500 : 400 }}>
+            {conv.pinned && <Pin size={10} style={{ color: 'var(--text-3)' }} className="shrink-0" />}
+            <p className="text-[13.5px] truncate flex-1" style={{ color: 'var(--text-1)', fontWeight: 550 }}>
               {conv.title}
             </p>
-          </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <ModelBadge modelId={conv.model as ModelId} size="xs" showName={false} />
-            <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>
-              {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true, locale: enUS })}
+            <span className="text-[11px] shrink-0" style={{ color: 'var(--text-3)' }}>
+              {shortTime(conv.updatedAt)}
             </span>
           </div>
+          <p className="text-[12px] truncate mt-0.5" style={{ color: 'var(--text-3)' }}>
+            {conv.preview || 'New conversation'}
+          </p>
         </div>
 
-        {/* Context menu button */}
-        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={e => { e.stopPropagation(); setMenuId(menuId === conv.id ? null : conv.id); }}
+            onClick={(e) => { e.stopPropagation(); setMenuId(menuId === conv.id ? null : conv.id); }}
             className="opacity-0 group-hover:opacity-100 p-1 rounded-lg transition-all"
             style={{ color: 'var(--text-3)' }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+            aria-label="Conversation options"
           >
-            <MoreHorizontal size={13} />
+            <MoreHorizontal size={15} />
           </button>
 
           {menuId === conv.id && (
             <div
-              className="absolute right-0 top-6 z-50 w-44 rounded-xl overflow-hidden animate-scale-in"
-              style={{ background: 'var(--bg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
+              className="absolute right-0 top-6 z-50 w-44 rounded-xl overflow-hidden animate-scale-in glass"
+              style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
             >
               <button
-                onClick={e => handlePin(e, conv)}
+                onClick={(e) => handlePin(e, conv)}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left"
                 style={{ color: 'var(--text-1)' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-2)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
               >
                 {conv.pinned ? <PinOff size={13} /> : <Pin size={13} />}
                 {conv.pinned ? 'Unpin' : 'Pin'}
               </button>
-              <div style={{ height: '1px', background: 'var(--border)', margin: '2px 0' }} />
+              <div style={{ height: '1px', background: 'var(--border)' }} />
               <button
-                onClick={e => handleDelete(e, conv.id)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left text-red-500"
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                onClick={(e) => handleDelete(e, conv.id)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left"
+                style={{ color: '#ff3b30' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(255,59,48,0.08)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
               >
                 <Trash2 size={13} /> Delete
               </button>
@@ -151,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
     );
   };
 
-  /* ── Collapsed sidebar ── */
+  /* ── Collapsed ── */
   if (!sidebarOpen) {
     return (
       <div
@@ -161,127 +175,116 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 rounded-xl transition-colors"
-          style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="Open sidebar"
+          style={{ color: 'var(--accent)' }}
+          aria-label="Open sidebar"
         >
-          <ChevronLeft size={16} className="rotate-180" />
+          <PanelLeft size={19} />
         </button>
         <button
           onClick={onNewChat}
-          className="p-2 rounded-xl text-white shadow-sm"
-          style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
-          title="New chat"
+          className="w-9 h-9 rounded-full brand-gradient flex items-center justify-center text-white shadow-sm"
+          aria-label="New chat"
+          title="New chat (⌘K)"
         >
-          <Plus size={16} />
+          <SquarePen size={16} />
         </button>
       </div>
     );
   }
 
-  /* ── Full sidebar ── */
+  /* ── Full ── */
   return (
     <div
-      className="flex flex-col w-[260px] h-full shrink-0 animate-slide-left"
+      className="flex flex-col w-[280px] h-full shrink-0 animate-slide-left"
       style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 pt-4 pb-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0 px-1">
-          <div
-            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
-          >
-            <span className="text-white text-[11px] font-bold">M</span>
+      <div className="flex items-center gap-2 px-3.5 pt-4 pb-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="w-7 h-7 rounded-lg brand-gradient flex items-center justify-center shrink-0 shadow-sm">
+            <span className="text-white text-[12px] font-bold">M</span>
           </div>
-          <span className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>maxAI</span>
+          <span className="font-semibold text-[17px] tracking-tight" style={{ color: 'var(--text-1)' }}>maxAI</span>
         </div>
         <button
           onClick={onNewChat}
           className="p-1.5 rounded-lg transition-colors"
-          style={{ color: 'var(--text-2)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="New chat (Ctrl+K)"
+          style={{ color: 'var(--accent)' }}
+          aria-label="New chat"
+          title="New chat (⌘K)"
         >
-          <MessageSquarePlus size={16} />
+          <SquarePen size={18} />
         </button>
         <button
           onClick={() => setSidebarOpen(false)}
           className="p-1.5 rounded-lg transition-colors"
           style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-          title="Close sidebar"
+          aria-label="Close sidebar"
         >
-          <ChevronLeft size={15} />
+          <PanelLeftClose size={17} />
         </button>
       </div>
 
-      {/* Search */}
-      <div className="px-3 mb-2">
+      <div className="px-3 mb-1.5">
         <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl text-[13px] focus:outline-none transition-colors"
-            style={{
-              background: 'var(--bg-3)',
-              color: 'var(--text-1)',
-              border: '1px solid transparent',
-            }}
-            onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)'}
-            onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'transparent'}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] focus:outline-none transition-colors"
+            style={{ background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid transparent' }}
+            onFocus={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)')}
+            onBlur={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'transparent')}
           />
         </div>
       </div>
 
-      {/* Conversations */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {filtered.length === 0 ? (
-          <div className="text-center py-10">
-            <Sparkles size={20} className="mx-auto mb-2" style={{ color: 'var(--text-3)' }} />
+          <div className="text-center py-12 px-4">
+            <MessageSquare size={22} className="mx-auto mb-2" style={{ color: 'var(--text-3)' }} />
             <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
-              {search ? 'No results' : 'No chats yet'}
+              {search ? 'No results' : 'No conversations yet'}
             </p>
+            {!search && (
+              <button
+                onClick={onNewChat}
+                className="mt-3 px-3.5 py-1.5 rounded-full text-[13px] font-medium text-white brand-gradient"
+              >
+                Start chatting
+              </button>
+            )}
           </div>
         ) : (
           <>
-            {/* Pinned */}
             {pinned.length > 0 && (
-              <div className="mb-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: 'var(--text-3)' }}>
+              <div className="mb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider px-2.5 mb-1" style={{ color: 'var(--text-3)' }}>
                   Pinned
                 </p>
-                {pinned.map(c => <ConvItem key={c.id} conv={c} />)}
+                {pinned.map((c) => <ConvItem key={c.id} conv={c} />)}
               </div>
             )}
-
-            {/* Grouped by date */}
             {(Object.entries(groups) as [DateGroup, Conversation[]][])
               .filter(([, items]) => items.length > 0)
               .map(([group, items]) => (
-                <div key={group} className="mb-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: 'var(--text-3)' }}>
+                <div key={group} className="mb-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider px-2.5 mb-1" style={{ color: 'var(--text-3)' }}>
                     {GROUP_LABELS[group]}
                   </p>
-                  {items.map(c => <ConvItem key={c.id} conv={c} />)}
+                  {items.map((c) => <ConvItem key={c.id} conv={c} />)}
                 </div>
               ))}
           </>
         )}
       </div>
 
-      {/* Footer */}
       <div className="p-2" style={{ borderTop: '1px solid var(--border)' }}>
         <button
           onClick={() => navigate('/settings')}
           className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-colors text-left"
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
         >
           <Avatar name={user?.name || user?.email || '?'} color={user?.avatarColor} size="sm" />
           <div className="flex-1 min-w-0">
@@ -290,7 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
             </p>
             <p className="text-[11px] truncate" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
           </div>
-          <Settings size={14} style={{ color: 'var(--text-3)' }} className="shrink-0" />
+          <Settings size={15} style={{ color: 'var(--text-3)' }} className="shrink-0" />
         </button>
       </div>
     </div>

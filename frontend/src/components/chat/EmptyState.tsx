@@ -1,28 +1,12 @@
 import React from 'react';
-import { MODELS } from '../../lib/models';
+import { PenLine, Code2, Brain, Lightbulb } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
-const SUGGESTION_GROUPS = [
-  {
-    icon: '✍️',
-    label: 'Write',
-    items: ['Draft a professional email', 'Write a blog post about AI'],
-  },
-  {
-    icon: '💻',
-    label: 'Code',
-    items: ['Debug my Python code', 'Explain an algorithm'],
-  },
-  {
-    icon: '🧠',
-    label: 'Analyze',
-    items: ['Analyze this text', 'Summarize a topic'],
-  },
-  {
-    icon: '💡',
-    label: 'Ideas',
-    items: ['Brainstorm for a project', 'Give me creative ideas'],
-  },
+const SUGGESTIONS = [
+  { icon: PenLine, label: 'Write', color: '#0a84ff', prompt: 'Draft a friendly but professional email to reschedule a meeting.' },
+  { icon: Code2, label: 'Code', color: '#5e5ce6', prompt: 'Explain the difference between async/await and Promises with an example.' },
+  { icon: Brain, label: 'Analyze', color: '#30d158', prompt: 'Summarize the key trade-offs between SQL and NoSQL databases.' },
+  { icon: Lightbulb, label: 'Ideas', color: '#ff9f0a', prompt: 'Give me five creative names for a productivity app and why they work.' },
 ];
 
 interface EmptyStateProps {
@@ -34,91 +18,54 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestion }) => {
 
   const hour = new Date().getHours();
   const timeGreeting =
-    hour < 5  ? 'Good night' :
+    hour < 5 ? 'Good night' :
     hour < 12 ? 'Good morning' :
     hour < 17 ? 'Good afternoon' :
     hour < 21 ? 'Good evening' : 'Good night';
 
   const firstName = user?.name?.split(' ')[0];
-  const greeting = firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting}`;
+  const greeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-6 overflow-y-auto">
-      {/* Hero */}
-      <div className="text-center mb-10 animate-fade-up">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-6 min-h-full">
+      <div className="text-center mb-9 animate-fade-up">
         <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #5B5BD6, #7C3AED)' }}
+          className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-5 brand-gradient"
+          style={{ boxShadow: '0 12px 40px rgba(10,132,255,0.35)' }}
         >
-          <span className="text-white text-xl font-bold">M</span>
+          <span className="text-white text-2xl font-bold">M</span>
         </div>
-        <h1 className="text-3xl font-semibold mb-2 gradient-text" style={{ letterSpacing: '-0.02em' }}>
-          {greeting} 👋
-        </h1>
-        <p className="text-base" style={{ color: 'var(--text-2)' }}>
-          How can I help you today?
+        <h1 className="text-[28px] font-bold mb-1.5 gradient-text tracking-tight">{greeting}</h1>
+        <p className="text-[15px]" style={{ color: 'var(--text-2)' }}>
+          What can I help you with today?
         </p>
       </div>
 
-      {/* Model pills */}
-      <div className="flex items-center gap-2 flex-wrap justify-center mb-8 animate-fade-up" style={{ animationDelay: '60ms' }}>
-        {MODELS.map((m) => (
-          <div
-            key={m.id}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-            style={{
-              background: `${m.color}12`,
-              color: m.color,
-              border: `1px solid ${m.color}28`,
-            }}
-          >
-            <span className="text-[11px]">{m.icon}</span>
-            <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{m.name}</span>
-            <span style={{ color: m.color, fontWeight: 600 }}>{m.badge}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Suggestion grid */}
-      <div
-        className="grid grid-cols-2 gap-2.5 w-full max-w-2xl animate-fade-up"
-        style={{ animationDelay: '120ms' }}
-      >
-        {SUGGESTION_GROUPS.map((group) =>
-          group.items.map((item, i) => (
+      <div className="grid grid-cols-2 gap-2.5 w-full max-w-lg animate-fade-up" style={{ animationDelay: '80ms' }}>
+        {SUGGESTIONS.map((s) => {
+          const Icon = s.icon;
+          return (
             <button
-              key={item}
-              onClick={() => onSuggestion(item)}
-              className="flex items-start gap-3 text-left px-4 py-3.5 rounded-2xl border transition-all hover:scale-[1.01] active:scale-[0.99]"
-              style={{
-                background: 'var(--bg-2)',
-                borderColor: 'var(--border)',
-                color: 'var(--text-2)',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)';
-                (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-                (e.currentTarget as HTMLElement).style.background = 'var(--bg-2)';
-              }}
+              key={s.label}
+              onClick={() => onSuggestion(s.prompt)}
+              className="flex flex-col gap-2.5 text-left p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: 'var(--bg-2)', borderColor: 'var(--border)' }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-2)')}
             >
-              {i === 0 && (
-                <span className="text-base leading-none mt-0.5 shrink-0">{group.icon}</span>
-              )}
-              {i !== 0 && <span className="w-5 shrink-0" />}
-              <div className="min-w-0">
-                {i === 0 && (
-                  <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {group.label}
-                  </p>
-                )}
-                <p className="text-sm leading-snug">{item}</p>
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: `${s.color}1f`, color: s.color }}
+              >
+                <Icon size={18} />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>{s.label}</p>
+                <p className="text-[12px] leading-snug mt-0.5" style={{ color: 'var(--text-3)' }}>{s.prompt}</p>
               </div>
             </button>
-          ))
-        )}
+          );
+        })}
       </div>
     </div>
   );

@@ -6,22 +6,22 @@ interface AvatarProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ name, color = '#6366f1', size = 'md' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ name, color = '#0a84ff', size = 'md' }) => {
   const initials = name
-    ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    ? name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
   const sizes = {
-    xs: 'w-5 h-5 text-[9px] rounded-md',
-    sm: 'w-7 h-7 text-xs rounded-lg',
-    md: 'w-8 h-8 text-sm rounded-xl',
-    lg: 'w-10 h-10 text-sm rounded-xl',
+    xs: 'w-5 h-5 text-[9px]',
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-9 h-9 text-sm',
+    lg: 'w-11 h-11 text-base',
   };
 
   return (
     <div
-      className={`${sizes[size]} flex items-center justify-center font-semibold text-white shrink-0 select-none`}
-      style={{ background: color }}
+      className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold text-white shrink-0 select-none`}
+      style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
     >
       {initials}
     </div>

@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Reply, SmilePlus } from 'lucide-react';
+import hljs from 'highlight.js/lib/common';
+import TextareaAutosize from 'react-textarea-autosize';
+import { Copy, Check, Reply, SmilePlus, RefreshCw, Pencil } from 'lucide-react';
 import type { Message } from '../../store/chatStore';
 import type { ModelId } from '../../lib/models';
 import type { ReactionType } from '../../lib/reactions';
-import { useAuthStore } from '../../store/authStore';
-import { Avatar } from '../ui/Avatar';
 import { ModelBadge } from '../ui/ModelBadge';
-import { TapbackBadge, TapbackPicker, InlineReaction } from './Tapback';
+import { TapbackBadge, TapbackPicker } from './Tapback';
 
-/* ── Code block with language label + copy ── */
-interface CodeBlockProps {
-  language?: string;
-  children?: string;
-}
-
-const CodeBlock: React.FC<CodeBlockProps> = ({ language, children = '' }) => {
+/* ── Code block with language label, syntax highlighting + copy ── */
+const CodeBlock: React.FC<{ language?: string; children?: string }> = ({ language, children = '' }) => {
   const [copied, setCopied] = useState(false);
+
+  const highlighted = useMemo(() => {
+    try {
+      if (language && hljs.getLanguage(language)) {
+        return hljs.highlight(children, { language }).value;
+      }
+      return hljs.highlightAuto(children).value;
+    } catch {
+      return null;
+    }
+  }, [children, language]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children);
@@ -29,17 +35,22 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, children = '' }) => {
     <div className="code-block-wrapper">
       <div className="code-block-header">
         <span>{language || 'code'}</span>
-        <button onClick={handleCopy}>
+        <button onClick={handleCopy} aria-label="Copy code">
           {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
         </button>
       </div>
-      <pre><code>{children}</code></pre>
+      <pre>
+        {highlighted !== null ? (
+          <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+        ) : (
+          <code>{children}</code>
+        )}
+      </pre>
     </div>
   );
 };
 
-/* ── Custom renderer map ── */
-const createComponents = () => ({
+const markdownComponents = {
   pre: ({ children }: { children?: React.ReactNode }) => {
     const child = React.Children.toArray(children)[0] as React.ReactElement<{ className?: string; children?: React.ReactNode }>;
     const className = child?.props?.className ?? '';
@@ -48,56 +59,74 @@ const createComponents = () => ({
     return <CodeBlock language={lang}>{String(code).replace(/\n$/, '')}</CodeBlock>;
   },
   code: (props: Record<string, unknown>) => {
-    const { inline, children, className } = props as { inline?: boolean; children?: React.ReactNode; className?: string };
-    if (inline) {
-      return <code className={className as string}>{children}</code>;
-    }
-    return <code>{children}</code>;
+    const { children, className } = props as { children?: React.ReactNode; className?: string };
+    return <code className={className as string}>{children}</code>;
   },
-});
+};
 
 /* ── Quoted preview of the message being replied to ── */
-interface ReplyPreviewProps {
-  target: Message;
-  align: 'left' | 'right';
-}
-
-const ReplyPreview: React.FC<ReplyPreviewProps> = ({ target, align }) => {
+const ReplyPreview: React.FC<{ target: Message; align: 'left' | 'right' }> = ({ target, align }) => {
   const author = target.role === 'assistant' ? 'Max' : 'You';
-  const snippet = target.content.replace(/\s+/g, ' ').trim().slice(0, 100);
+  const snippet = target.content.replace(/\s+/g, ' ').trim().slice(0, 90);
   return (
-    <div
-      className={`flex ${align === 'right' ? 'justify-end' : 'justify-start'} mb-1`}
-    >
+    <div className={`flex ${align === 'right' ? 'justify-end' : 'justify-start'} mb-1 px-1`}>
       <div
-        className="flex items-center gap-1.5 max-w-[75%] px-2.5 py-1 rounded-lg text-[11px] truncate"
-        style={{ background: 'var(--bg-3)', color: 'var(--text-3)', borderLeft: '2px solid var(--border-2)' }}
+        className="flex items-center gap-1.5 max-w-[75%] px-2.5 py-1 rounded-2xl text-[11px] truncate"
+        style={{ background: 'var(--bg-3)', color: 'var(--text-3)' }}
       >
         <Reply size={10} className="shrink-0" />
-        <span className="font-medium shrink-0" style={{ color: 'var(--text-2)' }}>{author}:</span>
+        <span className="font-semibold shrink-0" style={{ color: 'var(--text-2)' }}>{author}</span>
         <span className="truncate">{snippet || '…'}</span>
       </div>
     </div>
   );
 };
 
-/* ── Main component ── */
+/* ── Hover action button ── */
+const ActionButton: React.FC<{ title: string; onClick?: () => void; children: React.ReactNode }> = ({ title, onClick, children }) => (
+  <button
+    onClick={onClick}
+    title={title}
+    aria-label={title}
+    className="p-1.5 rounded-full transition-colors"
+    style={{ color: 'var(--text-3)' }}
+    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+  >
+    {children}
+  </button>
+);
+
 interface MessageBubbleProps {
   message: Message;
   chatModeEnabled?: boolean;
   replyTarget?: Message | null;
+  firstInGroup?: boolean;
+  tail?: boolean;
+  isLastAssistant?: boolean;
   onReact?: (reaction: ReactionType | null) => void;
   onReply?: () => void;
+  onRegenerate?: () => void;
+  onEdit?: (content: string) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
-  message, chatModeEnabled = false, replyTarget = null, onReact, onReply,
+  message,
+  chatModeEnabled = false,
+  replyTarget = null,
+  firstInGroup = true,
+  tail = true,
+  isLastAssistant = false,
+  onReact,
+  onReply,
+  onRegenerate,
+  onEdit,
 }) => {
-  const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
   const isUser = message.role === 'user';
-  const components = createComponents();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -110,148 +139,140 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     setPickerOpen(false);
   };
 
-  /* Reusable hover action buttons (reply + tapback), Chat Mode only. */
-  const ChatActions = () => {
-    if (!chatModeEnabled || message.pending) return null;
+  const startEdit = () => {
+    setDraft(message.content);
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (trimmed && trimmed !== message.content) onEdit?.(trimmed);
+  };
+
+  const canReact = chatModeEnabled && !message.pending && !message.streaming;
+
+  /* Reaction / reply actions available in Chat Mode. */
+  const chatActions = canReact && (
+    <div className="relative flex items-center">
+      <ActionButton title="Reply" onClick={onReply}><Reply size={14} /></ActionButton>
+      <ActionButton title="Tapback" onClick={() => setPickerOpen((v) => !v)}><SmilePlus size={14} /></ActionButton>
+      {pickerOpen && (
+        <div className={`absolute bottom-9 z-30 ${isUser ? 'right-0' : 'left-0'}`}>
+          <TapbackPicker current={message.reaction} onPick={handlePick} onClose={() => setPickerOpen(false)} />
+        </div>
+      )}
+    </div>
+  );
+
+  const timeLabel = new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  /* ── USER ── */
+  if (isUser) {
     return (
-      <div className="relative flex items-center gap-0.5">
-        <button
-          onClick={onReply}
-          title="Reply"
-          className="p-1.5 rounded-lg transition-colors"
-          style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-        >
-          <Reply size={13} />
-        </button>
-        <button
-          onClick={() => setPickerOpen(v => !v)}
-          title="Add tapback"
-          className="p-1.5 rounded-lg transition-colors"
-          style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-        >
-          <SmilePlus size={13} />
-        </button>
-        {pickerOpen && (
-          <div className={`absolute bottom-8 z-30 ${isUser ? 'right-0' : 'left-0'}`}>
-            <TapbackPicker current={message.reaction} onPick={handlePick} onClose={() => setPickerOpen(false)} />
+      <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-2' : 'mt-0.5'} ${tail ? 'mb-0.5' : ''} animate-bubble`}>
+        {replyTarget && <ReplyPreview target={replyTarget} align="right" />}
+        <div className="flex justify-end">
+          <div className="flex items-end gap-1.5 max-w-[82%] group">
+            {/* Hover actions to the left of the bubble */}
+            {!editing && (
+              <div className="flex items-center self-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {!message.pending && !message.streaming && onEdit && (
+                  <ActionButton title="Edit" onClick={startEdit}><Pencil size={13} /></ActionButton>
+                )}
+                <ActionButton title="Copy" onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />}</ActionButton>
+                {chatActions}
+              </div>
+            )}
+
+            {editing ? (
+              <div className="w-[min(560px,80vw)] rounded-2xl p-2" style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)' }}>
+                <TextareaAutosize
+                  value={draft}
+                  autoFocus
+                  minRows={1}
+                  maxRows={12}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                    if (e.key === 'Escape') setEditing(false);
+                  }}
+                  className="w-full px-2 py-1.5 text-[15px] resize-none focus:outline-none bg-transparent"
+                  style={{ color: 'var(--text-1)' }}
+                />
+                <div className="flex items-center justify-end gap-2 mt-1">
+                  <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-lg text-xs font-medium" style={{ color: 'var(--text-2)', background: 'var(--bg-3)' }}>Cancel</button>
+                  <button onClick={saveEdit} className="px-3 py-1 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--accent)' }}>Save & send</button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative pb-1">
+                <div className={`bubble bubble-out ${tail ? 'tail' : ''} whitespace-pre-wrap`}>
+                  {message.content}
+                </div>
+                {message.reaction && (
+                  <TapbackBadge reaction={message.reaction} side="left" onClick={() => canReact && setPickerOpen(true)} />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {message.edited && !editing && (
+          <div className="flex justify-end pr-1 mt-0.5">
+            <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>Edited</span>
           </div>
         )}
       </div>
     );
-  };
-
-  if (isUser) {
-    return (
-      <div className="flex flex-col px-4 py-1.5 animate-fade-up">
-        {replyTarget && <ReplyPreview target={replyTarget} align="right" />}
-        <div className="flex justify-end">
-          <div className="flex items-end gap-2.5 max-w-[80%] group">
-            {/* Hover actions to the left of the bubble */}
-            <div className="flex items-center self-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={handleCopy}
-                title="Copy"
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ color: 'var(--text-3)' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
-              </button>
-              <ChatActions />
-            </div>
-
-            <div className="relative mb-2">
-              <div
-                className="px-4 py-3 rounded-2xl rounded-br-md text-white text-sm leading-relaxed whitespace-pre-wrap"
-                style={{ background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)' }}
-              >
-                {message.content}
-              </div>
-              {message.reaction && (
-                <TapbackBadge reaction={message.reaction} side="left" onClick={() => chatModeEnabled && setPickerOpen(true)} />
-              )}
-            </div>
-            <Avatar name={user?.name || user?.email || '?'} color={user?.avatarColor} size="xs" />
-          </div>
-        </div>
-      </div>
-    );
   }
 
-  /* ── Assistant message ── */
+  /* ── ASSISTANT ── */
   const isThinking = message.streaming && !message.content;
 
   return (
-    <div className="flex flex-col px-4 py-2 animate-fade-up">
-      {replyTarget && (
-        <div className="pl-10">
-          <ReplyPreview target={replyTarget} align="left" />
-        </div>
-      )}
-      <div className="flex gap-3 group">
-        {/* Avatar */}
-        <div className="shrink-0 mt-0.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
-            <span className="text-white text-xs font-bold tracking-tight">M</span>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0 pb-1">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Max</span>
-            {message.model && (
-              <ModelBadge modelId={message.model as ModelId} size="xs" showName={false} />
+    <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-2' : 'mt-0.5'} ${tail ? 'mb-0.5' : ''} animate-bubble`}>
+      {replyTarget && <ReplyPreview target={replyTarget} align="left" />}
+      <div className="flex justify-start">
+        <div className="flex items-end gap-1.5 max-w-[86%] group">
+          <div className="relative pb-1 min-w-0">
+            <div className={`bubble bubble-in ${tail ? 'tail' : ''}`}>
+              {isThinking ? (
+                <div className="typing-dots"><span /><span /><span /></div>
+              ) : (
+                <div className={`prose-max ${message.streaming ? 'typing-cursor' : ''}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents as never}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+            {message.reaction && (
+              <TapbackBadge reaction={message.reaction} side="right" onClick={() => canReact && setPickerOpen(true)} />
             )}
           </div>
 
-          {/* Thinking state */}
-          {isThinking ? (
-            <div className="flex items-center gap-1.5 py-1">
-              <div className="loader-dots">
-                <span /><span /><span />
-              </div>
-              <span className="text-xs" style={{ color: 'var(--text-3)' }}>Thinking…</span>
-            </div>
-          ) : (
-            <>
-              <div className={`prose-max ${message.streaming ? 'typing-cursor' : ''}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={components as any}>
-                  {message.content}
-                </ReactMarkdown>
-              </div>
-              {message.reaction && (
-                <InlineReaction reaction={message.reaction} onClick={() => chatModeEnabled && setPickerOpen(true)} />
+          {/* Hover actions to the right of the bubble */}
+          {!isThinking && !message.streaming && message.content && (
+            <div className="flex items-center self-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <ActionButton title="Copy" onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />}</ActionButton>
+              {isLastAssistant && onRegenerate && (
+                <ActionButton title="Regenerate" onClick={onRegenerate}><RefreshCw size={13} /></ActionButton>
               )}
-            </>
-          )}
-
-          {/* Actions (shown on hover after streaming) */}
-          {!message.streaming && message.content && (
-            <div className="flex items-center gap-1 mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                style={{ color: 'var(--text-3)' }}
-              >
-                {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-              </button>
-              <ChatActions />
-              {message.tokens && (
-                <span className="text-xs px-2 py-1" style={{ color: 'var(--text-3)' }}>
-                  {message.tokens.toLocaleString()} tokens
-                </span>
-              )}
+              {chatActions}
             </div>
           )}
         </div>
       </div>
+
+      {/* Meta line (model + tokens + time), only on the tail message */}
+      {tail && !message.streaming && message.model && (
+        <div className="flex items-center gap-2 mt-1 pl-1">
+          <ModelBadge modelId={message.model as ModelId} size="xs" showName />
+          <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>{timeLabel}</span>
+          {message.tokens ? (
+            <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>· {message.tokens.toLocaleString()} tokens</span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
