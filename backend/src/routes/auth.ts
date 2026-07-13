@@ -32,7 +32,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
-      res.status(409).json({ error: 'E-Mail bereits registriert' });
+      res.status(409).json({ error: 'Email already registered' });
       return;
     }
 
@@ -61,6 +61,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         onboardingDone: user.onboardingDone,
         defaultModel: user.defaultModel,
+        personality: user.personality,
+        chatMode: user.chatMode,
         avatarColor: user.avatarColor,
       },
     });
@@ -70,7 +72,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: 'Interner Fehler' });
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
@@ -80,13 +82,13 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     const user = await prisma.user.findUnique({ where: { email: data.email } });
     if (!user) {
-      res.status(401).json({ error: 'Ungültige Anmeldedaten' });
+      res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
     const valid = await bcrypt.compare(data.password, user.password);
     if (!valid) {
-      res.status(401).json({ error: 'Ungültige Anmeldedaten' });
+      res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
@@ -106,6 +108,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         onboardingDone: user.onboardingDone,
         defaultModel: user.defaultModel,
+        personality: user.personality,
+        chatMode: user.chatMode,
         avatarColor: user.avatarColor,
         systemPrompt: user.systemPrompt,
       },
@@ -115,14 +119,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: err.errors[0].message });
       return;
     }
-    res.status(500).json({ error: 'Interner Fehler' });
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
 router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
-    res.status(400).json({ error: 'Refresh token fehlt' });
+    res.status(400).json({ error: 'Refresh token missing' });
     return;
   }
 
@@ -132,7 +136,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   });
 
   if (!stored || stored.expiresAt < new Date()) {
-    res.status(401).json({ error: 'Token abgelaufen' });
+    res.status(401).json({ error: 'Token expired' });
     return;
   }
 
@@ -158,7 +162,7 @@ router.post('/logout', authenticate, async (req: AuthRequest, res: Response): Pr
 router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) {
-    res.status(404).json({ error: 'Nicht gefunden' });
+    res.status(404).json({ error: 'Not found' });
     return;
   }
   res.json({
@@ -167,6 +171,8 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise
     name: user.name,
     onboardingDone: user.onboardingDone,
     defaultModel: user.defaultModel,
+    personality: user.personality,
+    chatMode: user.chatMode,
     avatarColor: user.avatarColor,
     systemPrompt: user.systemPrompt,
   });

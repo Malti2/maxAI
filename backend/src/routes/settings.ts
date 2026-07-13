@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { PERSONALITY_IDS } from '../services/personalities';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -9,6 +10,8 @@ const prisma = new PrismaClient();
 const UpdateSettingsSchema = z.object({
   name: z.string().min(2).optional(),
   defaultModel: z.enum(['lite', 'pro', 'beast', 'auto']).optional(),
+  personality: z.enum(PERSONALITY_IDS as [string, ...string[]]).optional(),
+  chatMode: z.boolean().optional(),
   systemPrompt: z.string().max(2000).optional().nullable(),
   avatarColor: z.string().optional(),
   onboardingDone: z.boolean().optional(),
@@ -27,6 +30,8 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       name: user.name,
       onboardingDone: user.onboardingDone,
       defaultModel: user.defaultModel,
+      personality: user.personality,
+      chatMode: user.chatMode,
       avatarColor: user.avatarColor,
       systemPrompt: user.systemPrompt,
     });
@@ -35,7 +40,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       res.status(400).json({ error: err.errors[0].message });
       return;
     }
-    res.status(500).json({ error: 'Interner Fehler' });
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 

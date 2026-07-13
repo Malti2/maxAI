@@ -22,5 +22,5 @@ app.use('/api/chat', chatRouter);
 app.use('/api/settings', settingsRouter);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Max Backend läuft auf Port ${PORT}`);
+  console.log(`🚀 maxAI backend running on port ${PORT}`);
 });

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
-import { Button } from '../components/ui/Button';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
@@ -29,7 +28,7 @@ export const AuthPage: React.FC = () => {
       setAuth(data.user, data.accessToken, data.refreshToken);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'Ein Fehler ist aufgetreten');
+      setError(msg || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -60,10 +59,10 @@ export const AuthPage: React.FC = () => {
             <span className="text-white text-xl font-bold">M</span>
           </div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
-            Willkommen bei Max
+            Welcome to maxAI
           </h1>
           <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
-            Dein persönlicher KI-Assistent
+            Your personal AI assistant
           </p>
         </div>
 
@@ -95,7 +94,7 @@ export const AuthPage: React.FC = () => {
                   background: 'transparent',
                 }}
               >
-                {m === 'login' ? 'Anmelden' : 'Registrieren'}
+                {m === 'login' ? 'Sign in' : 'Sign up'}
               </button>
             ))}
           </div>
@@ -117,7 +116,7 @@ export const AuthPage: React.FC = () => {
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="Dein Name"
+                    placeholder="Your name"
                     autoFocus
                     className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
                     style={{
@@ -137,7 +136,7 @@ export const AuthPage: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="name@beispiel.de"
+                  placeholder="name@example.com"
                   required
                   autoFocus={mode === 'login'}
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
@@ -157,7 +156,7 @@ export const AuthPage: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Passwort"
+                  placeholder="Password"
                   required
                   className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
                   style={{
@@ -207,10 +206,10 @@ export const AuthPage: React.FC = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Einen Moment…
+                    Just a moment…
                   </span>
                 ) : (
-                  mode === 'login' ? 'Anmelden' : 'Konto erstellen'
+                  mode === 'login' ? 'Sign in' : 'Create account'
                 )}
               </button>
             </motion.form>
@@ -218,19 +217,19 @@ export const AuthPage: React.FC = () => {
         </div>
 
         <p className="text-center text-sm mt-4" style={{ color: 'var(--text-3)' }}>
-          {mode === 'login' ? 'Noch kein Konto?' : 'Bereits registriert?'}{' '}
+          {mode === 'login' ? "Don't have an account?" : 'Already registered?'}{' '}
           <button
             onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(''); }}
             className="font-medium transition-colors"
             style={{ color: 'var(--accent)' }}
           >
-            {mode === 'login' ? 'Jetzt registrieren' : 'Anmelden'}
+            {mode === 'login' ? 'Sign up now' : 'Sign in'}
           </button>
         </p>
 
         {/* Feature pills */}
         <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
-          {['Max Lite', 'Max Pro', 'Max Beast', 'Auto'].map((f, i) => (
+          {['Max Lite', 'Max Pro', 'Max Beast', 'Auto'].map((f) => (
             <span
               key={f}
               className="text-[11px] px-2.5 py-1 rounded-full font-medium"

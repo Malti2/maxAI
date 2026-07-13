@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Palette, Brain, Trash2, LogOut, Check,
-  Moon, Sun, Monitor, ChevronRight
+  Moon, Sun, Monitor, MessageCircle
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { MODELS } from '../lib/models';
+import { PERSONALITIES, type PersonalityId } from '../lib/personalities';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useChatStore } from '../store/chatStore';
@@ -21,10 +22,10 @@ type Section = 'profile' | 'appearance' | 'models' | 'data';
 
 const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void }> = ({ active, onChange }) => {
   const items: { id: Section; label: string; icon: React.ReactNode }[] = [
-    { id: 'profile', label: 'Profil', icon: <User size={15} /> },
-    { id: 'appearance', label: 'Erscheinungsbild', icon: <Palette size={15} /> },
-    { id: 'models', label: 'KI & Modelle', icon: <Brain size={15} /> },
-    { id: 'data', label: 'Daten', icon: <Trash2 size={15} /> },
+    { id: 'profile', label: 'Profile', icon: <User size={15} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
+    { id: 'models', label: 'AI & Models', icon: <Brain size={15} /> },
+    { id: 'data', label: 'Data', icon: <Trash2 size={15} /> },
   ];
 
   return (
@@ -67,9 +68,9 @@ const SaveButton: React.FC<{ onClick: () => void; loading: boolean; saved: boole
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
     ) : saved ? (
-      <><Check size={14} /> Gespeichert</>
+      <><Check size={14} /> Saved</>
     ) : (
-      'Speichern'
+      'Save'
     )}
   </button>
 );
@@ -91,6 +92,8 @@ export const SettingsPage: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [color, setColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [model, setModel] = useState<ModelId>((user?.defaultModel as ModelId) || 'auto');
+  const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || 'assistant');
+  const [chatMode, setChatMode] = useState<boolean>(user?.chatMode ?? false);
   const [sysPrompt, setSysPrompt] = useState<string>(user?.systemPrompt ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,6 +105,8 @@ export const SettingsPage: React.FC = () => {
       const { data } = await api.put('/settings', {
         name: name || undefined,
         defaultModel: model,
+        personality,
+        chatMode,
         avatarColor: color,
         systemPrompt: sysPrompt || null,
       });
@@ -136,11 +141,10 @@ export const SettingsPage: React.FC = () => {
       case 'profile':
         return (
           <div className="space-y-5">
-            {/* Avatar preview */}
             <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-3)' }}>
               <Avatar name={name || user?.name || null} color={color} size="lg" />
               <div>
-                <p className="font-medium text-sm" style={{ color: 'var(--text-1)' }}>{name || user?.name || 'Kein Name'}</p>
+                <p className="font-medium text-sm" style={{ color: 'var(--text-1)' }}>{name || user?.name || 'No name'}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{user?.email}</p>
               </div>
             </div>
@@ -151,7 +155,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="Dein Name"
+                placeholder="Your name"
                 className={inputClass}
                 style={inputStyle}
                 onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
@@ -160,7 +164,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Avatar-Farbe" />
+              <FieldLabel label="Avatar color" />
               <div className="flex gap-3 flex-wrap">
                 {AVATAR_COLORS.map(c => (
                   <button
@@ -188,9 +192,9 @@ export const SettingsPage: React.FC = () => {
           <div className="space-y-3">
             <FieldLabel label="Theme" />
             {[
-              { value: 'light', label: 'Hell', icon: <Sun size={16} />, desc: 'Helles Interface' },
-              { value: 'dark', label: 'Dunkel', icon: <Moon size={16} />, desc: 'Dunkles Interface' },
-              { value: 'system', label: 'System', icon: <Monitor size={16} />, desc: 'Folgt dem Systemmodus' },
+              { value: 'light', label: 'Light', icon: <Sun size={16} />, desc: 'Light interface' },
+              { value: 'dark', label: 'Dark', icon: <Moon size={16} />, desc: 'Dark interface' },
+              { value: 'system', label: 'System', icon: <Monitor size={16} />, desc: 'Follows your system setting' },
             ].map(({ value, label, icon, desc }) => (
               <button
                 key={value}
@@ -217,8 +221,85 @@ export const SettingsPage: React.FC = () => {
       case 'models':
         return (
           <div className="space-y-5">
+            {/* Chat Mode toggle */}
             <div>
-              <FieldLabel label="Standardmodell" hint="Wird für neue Chats verwendet" />
+              <FieldLabel label="Chat Mode" hint="Send messages while Max is responding" />
+              <button
+                onClick={() => setChatMode(v => !v)}
+                className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                style={{
+                  borderColor: chatMode ? '#6366f1' + '60' : 'var(--border)',
+                  background: chatMode ? '#6366f1' + '08' : 'var(--bg)',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: chatMode ? '#6366f115' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                >
+                  <MessageCircle size={17} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Chat Mode</span>
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
+                      style={{ background: chatMode ? '#6366f118' : 'var(--bg-3)', color: chatMode ? '#6366f1' : 'var(--text-3)' }}
+                    >
+                      {chatMode ? 'On' : 'Off'}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                    Messages sent while Max is responding are queued and delivered together — Max replies naturally to all of them at once.
+                  </p>
+                </div>
+                {/* Toggle switch */}
+                <div
+                  className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
+                  style={{ background: chatMode ? '#6366f1' : 'var(--border-2)' }}
+                >
+                  <div
+                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                    style={{ left: chatMode ? '22px' : '4px' }}
+                  />
+                </div>
+              </button>
+            </div>
+
+            <div>
+              <FieldLabel label="Personality" hint="Controls Max's tone and style" />
+              <div className="space-y-2 mt-2">
+                {PERSONALITIES.map(p => {
+                  const Icon = p.icon;
+                  const selected = personality === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPersonality(p.id)}
+                      className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                      style={{
+                        borderColor: selected ? p.color + '60' : 'var(--border)',
+                        background: selected ? p.color + '08' : 'var(--bg)',
+                      }}
+                    >
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15`, color: p.color }}>
+                        <Icon size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{p.name}</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: `${p.color}18`, color: p.color }}>{p.tagline}</span>
+                        </div>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{p.description}</p>
+                      </div>
+                      {selected && <Check size={14} style={{ color: p.color }} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel label="Default model" hint="Used for new chats" />
               <div className="space-y-2 mt-2">
                 {MODELS.map(m => (
                   <button
@@ -247,11 +328,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <FieldLabel label="Systemanweisung" hint="Globales Verhalten von Max für alle Chats" />
+              <FieldLabel label="System instruction" hint="An extra instruction layered on top of the chosen personality" />
               <textarea
                 value={sysPrompt}
                 onChange={e => setSysPrompt(e.target.value)}
-                placeholder="z.B. Antworte immer auf Deutsch. Sei präzise und direkt. Du bist ein erfahrener Softwareentwickler…"
+                placeholder="e.g. Always answer in English. Be precise and direct. You are an experienced software engineer…"
                 rows={4}
                 className="w-full px-4 py-3 rounded-2xl text-sm focus:outline-none resize-none transition-colors"
                 style={{ ...inputStyle, lineHeight: '1.6' }}
@@ -259,7 +340,7 @@ export const SettingsPage: React.FC = () => {
                 onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
               />
               <p className="text-xs mt-1.5" style={{ color: 'var(--text-3)' }}>
-                {sysPrompt.length} / 2000 Zeichen
+                {sysPrompt.length} / 2000 characters
               </p>
             </div>
 
@@ -270,11 +351,10 @@ export const SettingsPage: React.FC = () => {
       case 'data':
         return (
           <div className="space-y-3">
-            {/* Delete history */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Chat-Verlauf löschen</p>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Delete chat history</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
-                Alle Konversationen und Nachrichten werden unwiderruflich gelöscht.
+                All conversations and messages will be permanently deleted.
               </p>
               {!deleteConfirm ? (
                 <button
@@ -284,7 +364,7 @@ export const SettingsPage: React.FC = () => {
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
                 >
-                  Verlauf löschen
+                  Delete history
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
@@ -292,36 +372,33 @@ export const SettingsPage: React.FC = () => {
                     onClick={handleDeleteAll}
                     className="px-3.5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors"
                   >
-                    Ja, löschen
+                    Yes, delete
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(false)}
                     className="px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
                     style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}
                   >
-                    Abbrechen
+                    Cancel
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Logout */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Abmelden</p>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-1)' }}>Log out</p>
               <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
-                Du wirst auf allen Geräten abgemeldet.
+                You will be logged out on all devices.
               </p>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ background: 'var(--bg-3)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'}
               >
-                <LogOut size={14} /> Abmelden
+                <LogOut size={14} /> Log out
               </button>
             </div>
 
-            {/* Account info */}
             <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Account</p>
               <p className="text-sm" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
@@ -333,7 +410,6 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3.5 shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
@@ -347,23 +423,21 @@ export const SettingsPage: React.FC = () => {
         >
           <ArrowLeft size={17} />
         </button>
-        <h1 className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Einstellungen</h1>
+        <h1 className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Settings</h1>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Nav */}
         <div className="w-52 shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}>
           <SectionNav active={section} onChange={setSection} />
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-md">
             <h2 className="text-base font-semibold mb-5" style={{ color: 'var(--text-1)' }}>
-              {section === 'profile' ? 'Profil'
-                : section === 'appearance' ? 'Erscheinungsbild'
-                : section === 'models' ? 'KI & Modelle'
-                : 'Daten & Datenschutz'}
+              {section === 'profile' ? 'Profile'
+                : section === 'appearance' ? 'Appearance'
+                : section === 'models' ? 'AI & Models'
+                : 'Data & Privacy'}
             </h2>
             {renderSection()}
           </div>
