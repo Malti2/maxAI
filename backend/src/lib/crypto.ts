@@ -1,4 +1,4 @@
-// Symmetric encryption for secrets stored in the database (e.g. Azure API keys).
+// Symmetric encryption for secrets stored in the database (e.g. provider API keys).
 //
 // Uses AES-256-GCM. The key is taken from ENCRYPTION_KEY (32-byte hex) when set,
 // otherwise derived deterministically from JWT_SECRET — so a stock install needs

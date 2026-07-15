@@ -75,8 +75,8 @@ model RefreshToken {
 }
 
 // Runtime-editable application settings (key/value). Used by the admin area to
-// override Azure configuration without a redeploy. Secret values are stored
-// encrypted (see lib/crypto.ts).
+// override the AI provider configuration without a redeploy. Secret values are
+// stored encrypted (see lib/crypto.ts).
 model Setting {
   key       String   @id
   value     String

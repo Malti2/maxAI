@@ -4,6 +4,7 @@ import { ArrowUp, Square, Reply, X } from 'lucide-react';
 import { ModelSelector } from '../ui/ModelSelector';
 import { useChatStore, type Message } from '../../store/chatStore';
 import type { ModelId } from '../../lib/models';
+import api from '../../lib/api';
 
 interface ChatInputProps {
   value: string;
@@ -82,7 +83,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         <div className="flex items-end gap-2">
-          {/* Model selector (like the iMessage attachment button) */}
+          {/* Model selector */}
           <div className="pb-1">
             <ModelSelector value={selectedModel} onChange={(m: ModelId) => setSelectedModel(m)} />
           </div>

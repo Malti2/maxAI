@@ -1,7 +1,13 @@
-// Runtime configuration for Azure OpenAI, resolved from (in order of priority):
+// Runtime configuration for the AI provider, resolved from (in order of
+// priority):
 //   1. Database settings (editable by the admin at runtime)
 //   2. Environment variables (set at install time)
 //   3. Built-in defaults
+//
+// maxAI talks to any endpoint that implements the standard Chat Completions
+// API (the same protocol served by many hosted and self-hosted model
+// gateways). A provider is therefore just a base URL, an API key and, per
+// model tier, the model name to request.
 //
 // Secret values (API keys) are stored encrypted in the database. A tiny cache
 // avoids hitting the DB on every streamed request; it is invalidated whenever
@@ -13,30 +19,29 @@ import { encryptSecret, decryptSecret, maskSecret } from '../lib/crypto';
 export type ResolvedModelId = 'lite' | 'pro' | 'beast';
 export const RESOLVED_MODELS: ResolvedModelId[] = ['lite', 'pro', 'beast'];
 
-const DEFAULT_API_VERSION = '2024-08-01-preview';
-const DEFAULT_DEPLOYMENTS: Record<ResolvedModelId, string> = {
+// A sensible default base URL. Any Chat-Completions-compatible endpoint works;
+// this one lets an operator get started by providing only an API key.
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_MODELS: Record<ResolvedModelId, string> = {
   lite: 'gpt-4o-mini',
   pro: 'gpt-4o',
   beast: 'gpt-4o',
 };
 
-export interface ResolvedAzureModel {
-  endpoint: string;
+export interface ResolvedProviderModel {
+  baseURL: string;
   apiKey: string;
-  deployment: string;
-  apiVersion: string;
+  model: string;
 }
 
-export interface ResolvedAzure {
-  apiVersion: string;
-  models: Record<ResolvedModelId, ResolvedAzureModel>;
+export interface ResolvedProvider {
+  models: Record<ResolvedModelId, ResolvedProviderModel>;
 }
 
 // ── Setting keys ─────────────────────────────────────────────────
-const K_API_VERSION = 'azure.apiVersion';
-const K_GLOBAL_ENDPOINT = 'azure.global.endpoint';
-const K_GLOBAL_APIKEY = 'azure.global.apiKey';
-const modelKey = (m: ResolvedModelId, field: 'endpoint' | 'apiKey' | 'deployment') => `azure.${m}.${field}`;
+const K_GLOBAL_BASE_URL = 'provider.global.baseURL';
+const K_GLOBAL_APIKEY = 'provider.global.apiKey';
+const modelKey = (m: ResolvedModelId, field: 'baseURL' | 'apiKey' | 'model') => `provider.${m}.${field}`;
 const SECRET_KEYS = new Set([K_GLOBAL_APIKEY, ...RESOLVED_MODELS.map((m) => modelKey(m, 'apiKey'))]);
 
 // ── DB access ────────────────────────────────────────────────────
@@ -68,36 +73,40 @@ async function writeSetting(key: string, value: string | null): Promise<void> {
 }
 
 // ── Resolution ───────────────────────────────────────────────────
-function resolve(db: Map<string, string>): ResolvedAzure {
-  const envEndpointGlobal = process.env.AZURE_ENDPOINT || '';
-  const envKeyGlobal = process.env.AZURE_API_KEY || '';
-  const apiVersion = db.get(K_API_VERSION) || process.env.AZURE_API_VERSION || DEFAULT_API_VERSION;
+function resolve(db: Map<string, string>): ResolvedProvider {
+  const envBaseUrlGlobal = process.env.AI_BASE_URL || '';
+  const envKeyGlobal = process.env.AI_API_KEY || '';
 
-  const models = {} as Record<ResolvedModelId, ResolvedAzureModel>;
+  const models = {} as Record<ResolvedModelId, ResolvedProviderModel>;
   for (const m of RESOLVED_MODELS) {
-    const envEndpoint = process.env[`AZURE_ENDPOINT_${m.toUpperCase()}`] || '';
-    const envKey = process.env[`AZURE_API_KEY_${m.toUpperCase()}`] || '';
-    const envDeployment = process.env[`AZURE_DEPLOYMENT_${m.toUpperCase()}`] || '';
+    const envBaseUrl = process.env[`AI_BASE_URL_${m.toUpperCase()}`] || '';
+    const envKey = process.env[`AI_API_KEY_${m.toUpperCase()}`] || '';
+    const envModel = process.env[`AI_MODEL_${m.toUpperCase()}`] || '';
 
     models[m] = {
-      endpoint: db.get(modelKey(m, 'endpoint')) || db.get(K_GLOBAL_ENDPOINT) || envEndpoint || envEndpointGlobal || '',
-      apiKey: db.get(modelKey(m, 'apiKey')) || db.get(K_GLOBAL_APIKEY) || envKey || envKeyGlobal || '',
-      deployment: db.get(modelKey(m, 'deployment')) || envDeployment || DEFAULT_DEPLOYMENTS[m],
-      apiVersion,
+      baseURL:
+        db.get(modelKey(m, 'baseURL')) ||
+        db.get(K_GLOBAL_BASE_URL) ||
+        envBaseUrl ||
+        envBaseUrlGlobal ||
+        DEFAULT_BASE_URL,
+      apiKey:
+        db.get(modelKey(m, 'apiKey')) || db.get(K_GLOBAL_APIKEY) || envKey || envKeyGlobal || '',
+      model: db.get(modelKey(m, 'model')) || envModel || DEFAULT_MODELS[m],
     };
   }
-  return { apiVersion, models };
+  return { models };
 }
 
 // ── Cache ────────────────────────────────────────────────────────
-let cache: { value: ResolvedAzure; at: number } | null = null;
+let cache: { value: ResolvedProvider; at: number } | null = null;
 const TTL_MS = 5000;
 
-export function invalidateAzureCache(): void {
+export function invalidateProviderCache(): void {
   cache = null;
 }
 
-export async function getResolvedAzure(): Promise<ResolvedAzure> {
+export async function getResolvedProvider(): Promise<ResolvedProvider> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.value;
   const value = resolve(await readSettings());
   cache = { value, at: Date.now() };
@@ -106,58 +115,53 @@ export async function getResolvedAzure(): Promise<ResolvedAzure> {
 
 // ── Admin view / update ──────────────────────────────────────────
 export interface AdminModelView {
-  endpoint: string;
-  deployment: string;
+  baseURL: string;
+  model: string;
   apiKeySet: boolean;
   apiKeyHint: string;
-  configured: boolean; // has both endpoint + apiKey
+  configured: boolean; // has both base URL + apiKey
 }
 
-export interface AdminAzureView {
-  apiVersion: string;
+export interface AdminProviderView {
   models: Record<ResolvedModelId, AdminModelView>;
 }
 
-export async function getAdminAzureView(): Promise<AdminAzureView> {
-  const resolved = await getResolvedAzure();
+export async function getAdminProviderView(): Promise<AdminProviderView> {
+  const resolved = await getResolvedProvider();
   const models = {} as Record<ResolvedModelId, AdminModelView>;
   for (const m of RESOLVED_MODELS) {
     const mc = resolved.models[m];
     models[m] = {
-      endpoint: mc.endpoint,
-      deployment: mc.deployment,
+      baseURL: mc.baseURL,
+      model: mc.model,
       apiKeySet: mc.apiKey.length > 0,
       apiKeyHint: mc.apiKey ? maskSecret(mc.apiKey) : '',
-      configured: mc.endpoint.length > 0 && mc.apiKey.length > 0,
+      configured: mc.baseURL.length > 0 && mc.apiKey.length > 0,
     };
   }
-  return { apiVersion: resolved.apiVersion, models };
+  return { models };
 }
 
-export interface AzureUpdate {
-  apiVersion?: string;
+export interface ProviderUpdate {
   models?: Partial<
-    Record<ResolvedModelId, { endpoint?: string; deployment?: string; apiKey?: string | null }>
+    Record<ResolvedModelId, { baseURL?: string; model?: string; apiKey?: string | null }>
   >;
 }
 
 // Apply an admin update. `undefined` fields are left unchanged; an empty string
-// clears endpoint/deployment (falling back to env); apiKey is only changed when
-// a non-empty value is provided, or cleared when explicitly `null`.
-export async function updateAzureConfig(update: AzureUpdate): Promise<void> {
-  if (update.apiVersion !== undefined) {
-    await writeSetting(K_API_VERSION, update.apiVersion.trim());
-  }
+// clears baseURL/model (falling back to env/defaults); apiKey is only changed
+// when a non-empty value is provided, or cleared when explicitly `null`.
+export async function updateProviderConfig(update: ProviderUpdate): Promise<void> {
   for (const m of RESOLVED_MODELS) {
     const patch = update.models?.[m];
     if (!patch) continue;
-    if (patch.endpoint !== undefined) await writeSetting(modelKey(m, 'endpoint'), patch.endpoint.trim());
-    if (patch.deployment !== undefined) await writeSetting(modelKey(m, 'deployment'), patch.deployment.trim());
+    if (patch.baseURL !== undefined) await writeSetting(modelKey(m, 'baseURL'), patch.baseURL.trim());
+    if (patch.model !== undefined) await writeSetting(modelKey(m, 'model'), patch.model.trim());
     if (patch.apiKey === null) {
       await writeSetting(modelKey(m, 'apiKey'), null);
     } else if (typeof patch.apiKey === 'string' && patch.apiKey.trim().length > 0) {
       await writeSetting(modelKey(m, 'apiKey'), patch.apiKey.trim());
     }
   }
-  invalidateAzureCache();
+  invalidateProviderCache();
 }

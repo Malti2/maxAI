@@ -1,9 +1,9 @@
-// Tiny WebAudio sound engine for iMessage-style send / receive cues.
+// Tiny WebAudio sound engine for send / receive cues.
 //
 // No audio files are shipped — the tones are synthesised on the fly, so there
-// is nothing to download and nothing that resembles Apple's copyrighted assets.
-// Sounds are gated behind a runtime flag mirrored from the user's setting and
-// only ever play after a user gesture (browsers block audio otherwise).
+// is nothing to download and no third-party audio assets involved. Sounds are
+// gated behind a runtime flag mirrored from the user's setting and only ever
+// play after a user gesture (browsers block audio otherwise).
 
 let ctx: AudioContext | null = null;
 let enabled = true;

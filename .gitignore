@@ -34,9 +34,6 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
-# SSL Certs
-nginx/certs/
-
 # Database
 *.db
 *.sqlite

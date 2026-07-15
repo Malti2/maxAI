@@ -2,8 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { REACTIONS, getReaction, type ReactionType } from '../../lib/reactions';
 
 /* ── Badge showing the tapback attached to a message ──
-   Rendered as a small circular bubble overlapping the corner of the message,
-   just like iMessage. `side` is where it sits relative to the bubble. */
+   Rendered as a small circular bubble overlapping the corner of the message.
+   `side` is where it sits relative to the bubble. */
 interface TapbackBadgeProps {
   reaction: string;
   side: 'left' | 'right';
@@ -20,7 +20,7 @@ export const TapbackBadge: React.FC<TapbackBadgeProps> = ({ reaction, side, onCl
       aria-label={`Tapback: ${config.label}`}
       className="absolute -top-3 flex items-center justify-center w-7 h-7 rounded-full text-[13px] shadow-sm transition-transform hover:scale-110 animate-scale-in"
       style={{
-        background: 'var(--imsg-in)',
+        background: 'var(--bubble-in)',
         border: '2px solid var(--bg)',
         [side]: '-10px',
       } as React.CSSProperties}

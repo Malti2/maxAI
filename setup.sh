@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # ============================================================
 #  maxAI — one-command installer
-#  Installs dependencies, generates secrets, asks for your keys
-#  (or lets you add them later in the admin area) and starts
-#  everything with Docker.
+#
+#  Installs Docker (if needed), generates all secrets, walks you
+#  through a few settings, then builds and starts everything.
+#  Designed for a fresh Ubuntu/Debian server, but works on any
+#  host with Docker.
 # ============================================================
 set -euo pipefail
 
@@ -22,6 +24,9 @@ echo -e "${BLUE}╚════════════════════�
 # ── helpers ────────────────────────────────────────────────
 have() { command -v "$1" >/dev/null 2>&1; }
 is_tty() { [ -t 0 ]; }
+
+SUDO=""
+if [ "$(id -u)" -ne 0 ] && have sudo; then SUDO="sudo"; fi
 
 gen_secret() {
   # $1 = number of random bytes
@@ -54,16 +59,28 @@ if ! have docker; then
   else yn=Y; fi
   if [[ "$yn" =~ ^[Yy] ]]; then
     info "Installing Docker…"
-    curl -fsSL https://get.docker.com | sh
-    (systemctl enable --now docker 2>/dev/null || true)
+    curl -fsSL https://get.docker.com | $SUDO sh
+    $SUDO systemctl enable --now docker 2>/dev/null || true
   else
     err "Docker is required. Aborting."; exit 1
   fi
 fi
-if ! docker compose version >/dev/null 2>&1; then
-  err "Docker Compose plugin not found. Install it and re-run."; exit 1
+
+# Use sudo for docker if the current user can't reach the daemon.
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  if [ -n "$SUDO" ] && $SUDO docker info >/dev/null 2>&1; then
+    DOCKER="$SUDO docker"
+    warn "Using sudo for Docker. Tip: 'sudo usermod -aG docker \$USER' then re-login to drop sudo."
+  else
+    err "Cannot talk to the Docker daemon. Is it running?"; exit 1
+  fi
 fi
-ok "Docker is available"
+
+if ! $DOCKER compose version >/dev/null 2>&1; then
+  err "The Docker Compose plugin was not found. Install it and re-run."; exit 1
+fi
+ok "Docker is ready"
 
 # ── 2. Secrets (generated once, preserved on re-runs) ──────
 POSTGRES_PASSWORD="$(read_env POSTGRES_PASSWORD)"; POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(gen_secret 24)}"
@@ -74,11 +91,15 @@ ok "Secrets generated"
 # ── 3. Interactive configuration ───────────────────────────
 echo -e "\n${BLUE}Basic settings${NC}"
 PORT_DEF="$(read_env PORT)"; PORT_DEF="${PORT_DEF:-80}"
-prompt PORT "Public HTTP port (redirects to 443)" "$PORT_DEF"
-URL_DEF="$(read_env FRONTEND_URL)"; URL_DEF="${URL_DEF:-https://localhost}"
-prompt FRONTEND_URL "Public URL / domain (start with https://)" "$URL_DEF"
+prompt PORT "Port to serve maxAI on" "$PORT_DEF"
+URL_DEF="$(read_env FRONTEND_URL)"
+if [ -z "$URL_DEF" ]; then
+  HOSTIP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  if [ "$PORT" = "80" ]; then URL_DEF="http://${HOSTIP:-localhost}"; else URL_DEF="http://${HOSTIP:-localhost}:${PORT}"; fi
+fi
+prompt FRONTEND_URL "Public URL (how you'll reach the app)" "$URL_DEF"
 
-echo -e "\n${BLUE}Admin account${NC} ${DIM}(only this email can access the admin area)${NC}"
+echo -e "\n${BLUE}Admin account${NC} ${DIM}(only this email can open the admin area)${NC}"
 ADMIN_EMAIL_DEF="$(read_env ADMIN_EMAIL)"
 prompt ADMIN_EMAIL "Admin email" "$ADMIN_EMAIL_DEF"
 ADMIN_PASSWORD="$(read_env ADMIN_PASSWORD)"
@@ -87,14 +108,14 @@ if [ -z "$ADMIN_PASSWORD" ]; then
   if [ -z "$ADMIN_PASSWORD" ]; then ADMIN_PASSWORD="$(gen_secret 9)"; GENERATED_PW=1; fi
 fi
 
-echo -e "\n${BLUE}Azure OpenAI${NC} ${DIM}(leave blank to skip — you can add keys later in Settings → Admin)${NC}"
-AZURE_ENDPOINT="$(read_env AZURE_ENDPOINT)"
-prompt AZURE_ENDPOINT "Azure endpoint URL" "$AZURE_ENDPOINT"
-AZURE_API_KEY="$(read_env AZURE_API_KEY)"
-prompt AZURE_API_KEY "Azure API key" "$AZURE_API_KEY" secret
-DL="$(read_env AZURE_DEPLOYMENT_LITE)";  prompt AZURE_DEPLOYMENT_LITE  "Deployment · Lite"  "${DL:-gpt-4o-mini}"
-DP="$(read_env AZURE_DEPLOYMENT_PRO)";   prompt AZURE_DEPLOYMENT_PRO   "Deployment · Pro"   "${DP:-gpt-4o}"
-DB="$(read_env AZURE_DEPLOYMENT_BEAST)"; prompt AZURE_DEPLOYMENT_BEAST "Deployment · Beast" "${DB:-gpt-4o}"
+echo -e "\n${BLUE}AI provider${NC} ${DIM}(any Chat-Completions-compatible endpoint; leave blank to add later in Settings → Admin)${NC}"
+AI_BASE_URL="$(read_env AI_BASE_URL)"
+prompt AI_BASE_URL "API base URL" "${AI_BASE_URL:-https://api.openai.com/v1}"
+AI_API_KEY="$(read_env AI_API_KEY)"
+prompt AI_API_KEY "API key" "$AI_API_KEY" secret
+ML="$(read_env AI_MODEL_LITE)";  prompt AI_MODEL_LITE  "Model · Lite"  "${ML:-gpt-4o-mini}"
+MP="$(read_env AI_MODEL_PRO)";   prompt AI_MODEL_PRO   "Model · Pro"   "${MP:-gpt-4o}"
+MB="$(read_env AI_MODEL_BEAST)"; prompt AI_MODEL_BEAST "Model · Beast" "${MB:-gpt-4o}"
 
 # ── 4. Write .env ──────────────────────────────────────────
 info "Writing .env"
@@ -117,33 +138,21 @@ REFRESH_TOKEN_TTL_DAYS=30
 ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-# Azure OpenAI (editable later in Settings → Admin)
-AZURE_ENDPOINT=${AZURE_ENDPOINT}
-AZURE_API_KEY=${AZURE_API_KEY}
-AZURE_API_VERSION=2024-08-01-preview
-AZURE_DEPLOYMENT_LITE=${AZURE_DEPLOYMENT_LITE}
-AZURE_DEPLOYMENT_PRO=${AZURE_DEPLOYMENT_PRO}
-AZURE_DEPLOYMENT_BEAST=${AZURE_DEPLOYMENT_BEAST}
+# AI provider (editable later in Settings → Admin)
+AI_BASE_URL=${AI_BASE_URL}
+AI_API_KEY=${AI_API_KEY}
+AI_MODEL_LITE=${AI_MODEL_LITE}
+AI_MODEL_PRO=${AI_MODEL_PRO}
+AI_MODEL_BEAST=${AI_MODEL_BEAST}
 EOF
 ok ".env written"
 
 # ── 5. Build & start ───────────────────────────────────────
-if [ ! -f nginx/certs/fullchain.pem ] || [ ! -f nginx/certs/privkey.pem ]; then
-  warn "SSL certificates not found in nginx/certs/."
-  info "Generating self-signed certificates for local development..."
-  mkdir -p nginx/certs
-  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout nginx/certs/privkey.pem -out nginx/certs/fullchain.pem \
-    -subj "/C=DE/ST=State/L=City/O=maxAI/OU=Dev/CN=localhost"
-  ok "Self-signed certificates generated."
-fi
-
 info "Building and starting containers (this can take a few minutes)…"
-docker compose up -d --build
+$DOCKER compose up -d --build
 
 echo -e "\n${GREEN}✅ maxAI is running!${NC}"
-HOSTIP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-echo -e "   Open: ${BLUE}${FRONTEND_URL}${NC}  ${DIM}(or http://${HOSTIP:-localhost}:${PORT})${NC}"
+echo -e "   Open: ${BLUE}${FRONTEND_URL}${NC}"
 echo -e "\n   Admin login:"
 echo -e "     email:    ${YELLOW}${ADMIN_EMAIL:-<not set>}${NC}"
 if [ "${GENERATED_PW:-0}" = "1" ]; then
@@ -151,7 +160,8 @@ if [ "${GENERATED_PW:-0}" = "1" ]; then
 else
   echo -e "     password: ${DIM}(the one you entered)${NC}"
 fi
-if [ -z "${AZURE_API_KEY}" ]; then
-  echo -e "\n   ${YELLOW}No Azure key set yet.${NC} Sign in and add it under ${BLUE}Settings → Admin${NC}."
+if [ -z "${AI_API_KEY}" ]; then
+  echo -e "\n   ${YELLOW}No API key set yet.${NC} Sign in and add it under ${BLUE}Settings → Admin${NC}."
 fi
-echo -e "\n   ${DIM}Logs:${NC} docker compose logs -f   ${DIM}·${NC}   ${DIM}Stop:${NC} docker compose down   ${DIM}·${NC}   ${DIM}Update:${NC} git pull && docker compose up -d --build"
+echo -e "\n   ${DIM}Logs:${NC} ${DOCKER} compose logs -f   ${DIM}·${NC}   ${DIM}Stop:${NC} ${DOCKER} compose down   ${DIM}·${NC}   ${DIM}Update:${NC} git pull && ${DOCKER} compose up -d --build"
+echo -e "\n   ${DIM}For HTTPS, put maxAI behind a TLS-terminating reverse proxy (see README).${NC}"

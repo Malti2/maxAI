@@ -138,7 +138,7 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Header — iMessage-style contact bar */}
+      {/* Header — contact bar */}
       <div
         className="glass flex items-center gap-3 px-3 py-2.5 shrink-0 z-10"
         style={{ borderBottom: '1px solid var(--border)' }}

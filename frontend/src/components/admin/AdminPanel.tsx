@@ -8,14 +8,13 @@ type ModelKey = 'lite' | 'pro' | 'beast';
 const MODEL_KEYS: ModelKey[] = ['lite', 'pro', 'beast'];
 
 interface AdminModelView {
-  endpoint: string;
-  deployment: string;
+  baseURL: string;
+  model: string;
   apiKeySet: boolean;
   apiKeyHint: string;
   configured: boolean;
 }
 interface AdminConfig {
-  apiVersion: string;
   models: Record<ModelKey, AdminModelView>;
 }
 type TestState = Record<ModelKey, { ok: boolean; error?: string } | 'loading' | undefined>;
@@ -24,9 +23,8 @@ const badge = (m: ModelKey) => MODELS.find((x) => x.badge.toLowerCase() === m)!;
 
 export const AdminPanel: React.FC = () => {
   const [config, setConfig] = useState<AdminConfig | null>(null);
-  const [apiVersion, setApiVersion] = useState('');
-  const [endpoints, setEndpoints] = useState<Record<ModelKey, string>>({ lite: '', pro: '', beast: '' });
-  const [deployments, setDeployments] = useState<Record<ModelKey, string>>({ lite: '', pro: '', beast: '' });
+  const [baseURLs, setBaseURLs] = useState<Record<ModelKey, string>>({ lite: '', pro: '', beast: '' });
+  const [models, setModels] = useState<Record<ModelKey, string>>({ lite: '', pro: '', beast: '' });
   const [apiKeys, setApiKeys] = useState<Record<ModelKey, string>>({ lite: '', pro: '', beast: '' });
   const [stats, setStats] = useState<{ users: number; conversations: number; messages: number } | null>(null);
   const [tests, setTests] = useState<TestState>({ lite: undefined, pro: undefined, beast: undefined });
@@ -36,9 +34,8 @@ export const AdminPanel: React.FC = () => {
 
   const hydrate = (c: AdminConfig) => {
     setConfig(c);
-    setApiVersion(c.apiVersion);
-    setEndpoints({ lite: c.models.lite.endpoint, pro: c.models.pro.endpoint, beast: c.models.beast.endpoint });
-    setDeployments({ lite: c.models.lite.deployment, pro: c.models.pro.deployment, beast: c.models.beast.deployment });
+    setBaseURLs({ lite: c.models.lite.baseURL, pro: c.models.pro.baseURL, beast: c.models.beast.baseURL });
+    setModels({ lite: c.models.lite.model, pro: c.models.pro.model, beast: c.models.beast.model });
     setApiKeys({ lite: '', pro: '', beast: '' });
   };
 
@@ -52,15 +49,15 @@ export const AdminPanel: React.FC = () => {
   const save = async () => {
     setSaving(true);
     try {
-      const models: Record<string, unknown> = {};
+      const payload: Record<string, unknown> = {};
       for (const m of MODEL_KEYS) {
-        models[m] = {
-          endpoint: endpoints[m],
-          deployment: deployments[m],
+        payload[m] = {
+          baseURL: baseURLs[m],
+          model: models[m],
           apiKey: apiKeys[m].trim() || (config?.models[m].apiKeySet ? undefined : null),
         };
       }
-      const { data } = await api.put('/admin/config', { apiVersion, models });
+      const { data } = await api.put('/admin/config', { models: payload });
       hydrate(data);
       setSaved(true);
       toast.success('Configuration saved.');
@@ -100,8 +97,9 @@ export const AdminPanel: React.FC = () => {
         <div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Admin area</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-2)' }}>
-            Configure the Azure OpenAI keys behind Max. Changes take effect immediately — no redeploy needed.
-            API keys are stored encrypted and never shown again.
+            Connect the AI provider behind Max. maxAI works with any endpoint that speaks the standard
+            Chat Completions API — set a base URL, model name and key per tier. Changes take effect
+            immediately, no redeploy needed. API keys are stored encrypted and never shown again.
           </p>
         </div>
       </div>
@@ -121,19 +119,6 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      <div>
-        <label className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Azure API version</label>
-        <input
-          value={apiVersion}
-          onChange={(e) => setApiVersion(e.target.value)}
-          placeholder="2024-08-01-preview"
-          className="w-full mt-1.5 px-4 py-2.5 rounded-2xl text-sm focus:outline-none transition-colors"
-          style={{ background: 'var(--bg)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-2)')}
-        />
-      </div>
-
       {MODEL_KEYS.map((m) => {
         const b = badge(m);
         const view = config?.models[m];
@@ -152,16 +137,16 @@ export const AdminPanel: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-2.5">
               <input
-                value={endpoints[m]}
-                onChange={(e) => setEndpoints((s) => ({ ...s, [m]: e.target.value }))}
-                placeholder="https://your-resource.openai.azure.com"
+                value={baseURLs[m]}
+                onChange={(e) => setBaseURLs((s) => ({ ...s, [m]: e.target.value }))}
+                placeholder="API base URL (e.g. https://api.openai.com/v1)"
                 className="w-full px-3.5 py-2 rounded-xl text-[13px] focus:outline-none"
                 style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
               />
               <input
-                value={deployments[m]}
-                onChange={(e) => setDeployments((s) => ({ ...s, [m]: e.target.value }))}
-                placeholder="Deployment name (e.g. gpt-4o)"
+                value={models[m]}
+                onChange={(e) => setModels((s) => ({ ...s, [m]: e.target.value }))}
+                placeholder="Model name (e.g. gpt-4o)"
                 className="w-full px-3.5 py-2 rounded-xl text-[13px] focus:outline-none"
                 style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text-1)' }}
               />
