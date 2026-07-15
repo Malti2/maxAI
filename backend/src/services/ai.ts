@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getResolvedAzure, type ResolvedModelId, type ResolvedAzureModel } from './config';
+import { getResolvedProvider, type ResolvedModelId, type ResolvedProviderModel } from './config';
 
 export type ModelId = 'lite' | 'pro' | 'beast' | 'auto';
 export type { ResolvedModelId } from './config';
@@ -30,17 +30,15 @@ export function resolveModel(modelId: ModelId, messages: Array<{ role: string; c
   return modelId === 'auto' ? selectAutoModel(messages) : modelId;
 }
 
-function createClient(mc: ResolvedAzureModel): OpenAI {
-  if (!mc.endpoint || !mc.apiKey) {
+function createClient(mc: ResolvedProviderModel): OpenAI {
+  if (!mc.baseURL || !mc.apiKey) {
     throw new Error(
-      'Azure OpenAI is not configured. Add your endpoint and API key in the admin area (or the .env file).'
+      'The AI provider is not configured. Add your API base URL and key in the admin area (or the .env file).'
     );
   }
   return new OpenAI({
     apiKey: mc.apiKey,
-    baseURL: `${mc.endpoint.replace(/\/+$/, '')}/openai/deployments/${mc.deployment}`,
-    defaultQuery: { 'api-version': mc.apiVersion },
-    defaultHeaders: { 'api-key': mc.apiKey },
+    baseURL: mc.baseURL.replace(/\/+$/, ''),
   });
 }
 
@@ -58,8 +56,8 @@ export async function streamChat(
   signal?: AbortSignal
 ): Promise<StreamResult> {
   const resolvedModel = resolveModel(modelId, messages);
-  const azure = await getResolvedAzure();
-  const mc = azure.models[resolvedModel];
+  const provider = await getResolvedProvider();
+  const mc = provider.models[resolvedModel];
   const client = createClient(mc);
 
   const messageList: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [];
@@ -71,7 +69,7 @@ export async function streamChat(
 
   const stream = await client.chat.completions.create(
     {
-      model: mc.deployment,
+      model: mc.model,
       messages: messageList,
       stream: true,
       temperature: TEMPERATURE[resolvedModel],
@@ -97,11 +95,11 @@ export async function streamChat(
 // completion and reports success or a clean error message.
 export async function testModel(modelId: ResolvedModelId): Promise<{ ok: boolean; error?: string }> {
   try {
-    const azure = await getResolvedAzure();
-    const mc = azure.models[modelId];
+    const provider = await getResolvedProvider();
+    const mc = provider.models[modelId];
     const client = createClient(mc);
     await client.chat.completions.create({
-      model: mc.deployment,
+      model: mc.model,
       messages: [{ role: 'user', content: 'ping' }],
       max_tokens: 1,
     });

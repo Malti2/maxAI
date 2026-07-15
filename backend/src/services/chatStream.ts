@@ -7,7 +7,7 @@
 
 import type { Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { streamChat, resolveModel, type ModelId } from './azure';
+import { streamChat, resolveModel, type ModelId } from './ai';
 import { AssistantStreamFilter, type ApiMessage } from './chatMode';
 
 export interface AssistantTurnParams {

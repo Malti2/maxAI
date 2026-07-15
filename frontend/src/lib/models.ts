@@ -9,14 +9,14 @@ export interface ModelConfig {
   icon: string;
 }
 
-// Colours follow the iOS system palette for a cohesive, Apple-like feel.
+// A cohesive, vivid system-style palette for the model tiers.
 export const MODELS: ModelConfig[] = [
   {
     id: 'auto',
     name: 'Max',
     badge: 'Auto',
     description: 'Automatically picks the best model',
-    color: '#30d158', // iOS green
+    color: '#30d158', // green
     icon: '✦',
   },
   {
@@ -24,7 +24,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Lite',
     description: 'Fast & efficient for everyday tasks',
-    color: '#5ac8fa', // iOS light blue
+    color: '#5ac8fa', // light blue
     icon: '◈',
   },
   {
@@ -32,7 +32,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Pro',
     description: 'Powerful for complex tasks',
-    color: '#5e5ce6', // iOS indigo
+    color: '#5e5ce6', // indigo
     icon: '◆',
   },
   {
@@ -40,7 +40,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Beast',
     description: 'Maximum performance for the most demanding tasks',
-    color: '#ff9f0a', // iOS orange
+    color: '#ff9f0a', // orange
     icon: '⬡',
   },
 ];

@@ -1,8 +1,8 @@
 // Tapback (message reaction) definitions shared across the backend.
 //
-// A tapback is a lightweight, iMessage-style reaction that can be attached to a
-// single message. In Chat Mode the user can react to Max's messages, and Max
-// can react to the user's messages. Each message carries at most one tapback.
+// A tapback is a lightweight, quick reaction that can be attached to a single
+// message. In Chat Mode the user can react to Max's messages, and Max can react
+// to the user's messages. Each message carries at most one tapback.
 
 export type ReactionType =
   | 'love'

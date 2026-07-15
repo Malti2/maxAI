@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../lib/asyncHandler';
-import { type ModelId } from '../services/azure';
+import { type ModelId } from '../services/ai';
 import { buildSystemPrompt } from '../services/personalities';
 import {
   chatModeInstructions,

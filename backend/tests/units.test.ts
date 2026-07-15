@@ -1,7 +1,7 @@
 // Ensure env is valid before importing modules that read it lazily.
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'x'.repeat(40);
 
-import { selectAutoModel, resolveModel } from '../src/services/azure';
+import { selectAutoModel, resolveModel } from '../src/services/ai';
 import { toPublicUser } from '../src/lib/serialize';
 import { encryptSecret, decryptSecret, maskSecret } from '../src/lib/crypto';
 

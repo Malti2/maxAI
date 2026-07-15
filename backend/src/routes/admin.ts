@@ -5,31 +5,31 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { asyncHandler } from '../lib/asyncHandler';
 import {
-  getAdminAzureView,
-  updateAzureConfig,
+  getAdminProviderView,
+  updateProviderConfig,
   RESOLVED_MODELS,
   type ResolvedModelId,
 } from '../services/config';
-import { testModel } from '../services/azure';
+import { testModel } from '../services/ai';
 
 const router = Router();
 
 // Everything under /api/admin requires the designated admin account.
 router.use(authenticate, requireAdmin);
 
-// ── Azure configuration ──────────────────────────────────────────
+// ── AI provider configuration ────────────────────────────────────
 
 router.get(
   '/config',
   asyncHandler(async (_req: AuthRequest, res: Response) => {
-    res.json(await getAdminAzureView());
+    res.json(await getAdminProviderView());
   })
 );
 
 const ModelPatch = z
   .object({
-    endpoint: z.string().max(500).optional(),
-    deployment: z.string().max(200).optional(),
+    baseURL: z.string().max(500).optional(),
+    model: z.string().max(200).optional(),
     // A non-empty string sets the key; null clears it; omitting leaves it as-is.
     apiKey: z.string().max(500).nullable().optional(),
   })
@@ -37,7 +37,6 @@ const ModelPatch = z
 
 const UpdateConfigSchema = z
   .object({
-    apiVersion: z.string().max(50).optional(),
     models: z
       .object({
         lite: ModelPatch.optional(),
@@ -53,8 +52,8 @@ router.put(
   '/config',
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const update = UpdateConfigSchema.parse(req.body);
-    await updateAzureConfig(update);
-    res.json(await getAdminAzureView());
+    await updateProviderConfig(update);
+    res.json(await getAdminProviderView());
   })
 );
 

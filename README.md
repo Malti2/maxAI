@@ -1,60 +1,40 @@
 # maxAI 🚀
 
-**maxAI** is the platform. **Max** is the name of the AI — your personal assistant with its own iMessage-inspired interface, powered by Azure OpenAI.
+**maxAI** is the platform. **Max** is the AI — your own self-hosted assistant
+with a polished chat interface, multiple model tiers and switchable
+personalities. It runs anywhere Docker runs and connects to any AI endpoint
+that speaks the standard Chat Completions API.
 
 ## Features
 
-- **4 models**: Max Lite ◈, Max Pro ◆, Max Beast ⬡, Auto ✦
-- **3 personalities**: Casual (relaxed & direct), Assistant (balanced), Professional (formal)
-- **iMessage-style design**: real message bubbles with tails for both sides, tapback reactions, replies, typing indicator, delivered receipts, date separators, and optional send/receive sounds — in light & dark
-- **Apple-like polish**: SF-first typography, translucent bars, iOS system colours, subtle spring animations
-- **Chat Mode**: message-by-message chatting with queued messages, tapback reactions and replies
-- **Regenerate & edit**: re-roll Max's last answer, or edit one of your messages and continue from there
-- **Chat history**: search, pin, delete, with a Messages-style conversation list (avatar, preview, time)
-- **Streaming**: responses render in real time with live Markdown + syntax highlighting
-- **Keyboard shortcuts**: ⌘K new chat, ⌘B toggle sidebar, ⌘/ shortcut help
-- **Login + registration**: JWT-based with rotating refresh tokens
-- **Onboarding**: step-by-step setup on first login (incl. personality choice)
-- **Settings**: profile, theme (light/dark/system), sound, personality, default model, system instruction
-- **Auto mode**: automatically picks the right model based on complexity
+- **4 model tiers**: Max Lite ◈, Max Pro ◆, Max Beast ⬡ and Auto ✦ (which picks
+  the right tier automatically based on the request).
+- **3 personalities**: Casual (relaxed & direct), Assistant (balanced) and
+  Professional (formal), each layered on top of an optional custom instruction.
+- **Polished chat UI**: message bubbles with tails on both sides, tapback
+  reactions, replies, a typing indicator, delivered receipts, date separators
+  and optional synthesised send/receive sounds — in light & dark.
+- **Chat Mode**: message-by-message chatting with queued messages, tapback
+  reactions and replies.
+- **Regenerate & edit**: re-roll Max's last answer, or edit one of your messages
+  and continue from there.
+- **Chat history**: search, pin and delete, with a clean conversation list.
+- **Streaming**: responses render in real time with live Markdown + syntax
+  highlighting.
+- **Keyboard shortcuts**: ⌘K new chat, ⌘B toggle sidebar, ⌘/ shortcut help.
+- **Auth**: JWT-based login & registration with rotating refresh tokens.
+- **Onboarding**: guided first-run setup, including the personality choice.
+- **Settings**: profile, theme (light/dark/system), sound, personality, default
+  model and a custom system instruction.
+- **Admin area**: a single admin account can configure the AI provider (base
+  URL, model and API key per tier) at runtime, with connection tests. Keys are
+  stored **encrypted**.
 
-## What's new in 2.0
+## Quick start
 
-- **Redesigned UI** modelled on iMessage: bubbles with tails, tapbacks pinned to corners, a typing bubble, "Delivered", grouped messages and time separators.
-- **One-command install** — `bash setup.sh` installs Docker, generates all secrets, seeds an admin account and starts everything.
-- **Admin area** (Settings → Admin, restricted to `ADMIN_EMAIL`) to set/change the Azure keys per model at runtime, with connection tests. Keys are stored encrypted.
-- **Regenerate** (`POST /api/chat/conversations/:id/regenerate`) and **edit & resend** (`PUT /api/chat/conversations/:id/messages/:messageId`).
-- **Message sounds** — synthesised on the fly (no audio assets), toggleable per user.
-- **Production hardening** — a single shared Prisma client, validated environment, a global error handler, request logging, graceful shutdown, SSE abort-on-disconnect, stricter input validation, and DB indexes.
-- **Bug fixes** — streaming now targets the correct message in Chat Mode, conversation titles are only set once, and freshly-registered users get their full profile.
-
-## Personalities
-
-Max can respond in three personalities. The choice sets identity, tone and formatting; an optional custom system instruction is layered on top.
-
-| Personality | Style | Description |
-|----------------|------|--------------|
-| **Casual** | relaxed & direct | Like a text from a clever friend — lowercase, short, no fluff, no emojis |
-| **Assistant** | balanced (default) | Friendly and clear with clean Markdown formatting |
-| **Professional** | formal & precise | Objective, structured and business-ready |
-
-The personality is stored per user (`User.personality`, default: `assistant`) and applied server-side as a system prompt (`backend/src/services/personalities.ts`).
-
-## Chat Mode
-
-When enabled in Settings, Chat Mode turns maxAI into a live, message-by-message chat:
-
-- **Queued messages**: send more messages while Max is still responding — they are delivered together and Max replies to all of them at once.
-- **Tapbacks**: react to any message with a tapback (❤️ 👍 👎 😂 ‼️ ❓). You can react to Max's messages, and Max can react to yours. When a tapback is added, the model is told which message was reacted to and with what.
-- **Replies**: reply to a specific earlier message, like in a real chat app. The quoted message is shown above yours and the model is given the reply context.
-
-Tapbacks and replies are only available while Chat Mode is enabled.
-
-## Quick start (VPS)
-
-The installer does everything for you — it installs Docker if needed, generates
-all secrets, asks for an admin account and (optionally) your Azure keys, then
-builds and starts the stack.
+The installer does everything: it installs Docker if needed, generates all
+secrets, asks for an admin account and (optionally) your AI provider details,
+then builds and starts the stack.
 
 ```bash
 git clone https://github.com/Malti2/maxAI.git
@@ -62,27 +42,34 @@ cd maxAI
 bash setup.sh
 ```
 
-That's it. Open the printed URL and sign in with the admin account you chose.
+Open the printed URL and sign in with the admin account you chose. Tested on a
+fresh Ubuntu server; works on any Docker host.
 
 > [!TIP]
-> You can leave the Azure keys blank during setup and add them later in the
-> browser under **Settings → Admin** — no redeploy needed.
+> You can leave the API key blank during setup and add it later in the browser
+> under **Settings → Admin** — no redeploy needed.
 
-### Admin area
+### The AI provider
 
-Only the account whose email matches `ADMIN_EMAIL` can open the admin area
-(**Settings → Admin**). There you can set and change the Azure endpoint, API key
-and deployment name per model, and test connectivity. API keys are stored
-**encrypted** in the database and are never shown again. The admin account is
-created automatically on first boot from `ADMIN_EMAIL` + `ADMIN_PASSWORD`, so
-nobody else can claim that email.
+maxAI talks to any endpoint that implements the standard **Chat Completions
+API**. For each tier you provide:
+
+- an **API base URL** (e.g. `https://api.openai.com/v1`, a self-hosted gateway,
+  or a local model server),
+- a **model name** to request, and
+- an **API key**.
+
+Set a global default (used by every tier) or override any tier individually.
+The admin area (**Settings → Admin**, restricted to `ADMIN_EMAIL`) lets you set
+and test all of this at runtime; API keys are stored encrypted and never shown
+again.
 
 <details>
 <summary>Manual configuration (optional)</summary>
 
 ```bash
 cp .env.example .env
-nano .env        # secrets, ADMIN_EMAIL/ADMIN_PASSWORD, (optional) Azure keys
+nano .env        # secrets, ADMIN_EMAIL/ADMIN_PASSWORD, (optional) API keys
 docker compose up -d --build
 ```
 
@@ -94,30 +81,40 @@ docker compose up -d --build
 | `JWT_SECRET` | Random key (`openssl rand -hex 64`) |
 | `ENCRYPTION_KEY` | Optional; encrypts admin-set keys (derived from `JWT_SECRET` if unset) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | The single admin account, seeded on first boot |
-| `AZURE_ENDPOINT` / `AZURE_API_KEY` | Azure OpenAI endpoint + key (or set them in the admin area) |
-| `AZURE_DEPLOYMENT_LITE/PRO/BEAST` | Deployment names per model |
+| `PORT` | Public port maxAI is served on (default `80`) |
+| `FRONTEND_URL` | Public URL / domain (used for CORS) |
+| `AI_BASE_URL` / `AI_API_KEY` | Global provider base URL + key |
+| `AI_MODEL_LITE/PRO/BEAST` | Model name requested per tier |
 
 </details>
+
+### HTTPS
+
+maxAI serves plain HTTP on a single port so it works out of the box. For a
+public deployment, terminate TLS in front of it — for example with a reverse
+proxy such as Caddy (automatic certificates) or nginx with a Let's Encrypt
+certificate — and point it at maxAI's port. Keep `FRONTEND_URL` in `.env` in
+sync with your public `https://` address.
 
 ## Architecture
 
 ```
 ├── frontend/        React + TypeScript + Tailwind CSS (Vite)
-│   └── src/
-│       ├── components/  chat/, layout/, ui/, admin/ (AdminPanel)
-│       ├── hooks/       useChat.ts (shared SSE send/regenerate/edit)
-│       ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts, sounds.ts
-│       └── store/       auth, chat, theme, toast (Zustand)
+│   ├── src/
+│   │   ├── components/  chat/, layout/, ui/, admin/ (AdminPanel)
+│   │   ├── hooks/       useChat.ts (shared SSE send/regenerate/edit)
+│   │   ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts, sounds.ts
+│   │   └── store/       auth, chat, theme, toast (Zustand)
+│   └── nginx.conf   serves the SPA and reverse-proxies /api to the backend
 ├── backend/         Node.js + Express + TypeScript
 │   ├── src/
 │   │   ├── lib/       prisma.ts, env.ts, crypto.ts, serialize.ts, bootstrap.ts, asyncHandler.ts
 │   │   ├── middleware/ auth.ts, admin.ts, error.ts
 │   │   ├── routes/    auth.ts, chat.ts, settings.ts, admin.ts
-│   │   └── services/  azure.ts, config.ts (runtime Azure config), personalities.ts,
-│   │                  chatMode.ts, chatStream.ts, reactions.ts
+│   │   └── services/  ai.ts (provider client), config.ts (runtime provider config),
+│   │                  personalities.ts, chatMode.ts, chatStream.ts, reactions.ts
 │   └── prisma/        schema.prisma + migrations/
-├── nginx/           reverse proxy configuration
-└── docker-compose.yml
+└── docker-compose.yml   postgres + backend + web (single public port)
 ```
 
 ## Database migrations
@@ -135,12 +132,15 @@ npx prisma migrate dev --name your_change
 
 ## Models
 
-| Model | Color | Use |
+| Model | Colour | Use |
 |--------|-------|-----------|
-| Max Lite ◈ | Cyan | Short, simple requests |
+| Max Lite ◈ | Light blue | Short, simple requests |
 | Max Pro ◆ | Indigo | Complex tasks |
 | Max Beast ⬡ | Orange | Maximum performance |
 | Max Auto ✦ | Green | Automatic selection |
+
+Each tier maps to a model name on your configured provider; Auto routes each
+request to a tier based on its complexity.
 
 ## Development
 
@@ -154,12 +154,19 @@ cd frontend && npm install
 npm run dev
 ```
 
+The frontend dev server proxies `/api` to `http://localhost:3001`.
+
 ## Useful commands
 
 ```bash
 docker compose logs -f backend    # Backend logs
-docker compose logs -f frontend   # Frontend logs
+docker compose logs -f web        # Web / proxy logs
 docker compose restart backend    # Restart backend
 docker compose down               # Stop everything
 docker compose up -d --build      # Start with rebuild
 ```
+
+## Documentation
+
+- [Personalities](docs/personalities.md) — how Max's tone is configured.
+- [Chat Mode](docs/chat-mode.md) — tapbacks, replies and message queueing.
