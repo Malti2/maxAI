@@ -283,7 +283,10 @@ router.post(
 
     const conv = await prisma.conversation.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      include: { messages: { orderBy: { createdAt: 'asc' }, take: HISTORY_LIMIT } },
+      // Take the *most recent* HISTORY_LIMIT messages (desc), then restore
+      // chronological order below. Ordering asc with `take` would keep the
+      // oldest messages instead and drop recent context on long conversations.
+      include: { messages: { orderBy: { createdAt: 'desc' }, take: HISTORY_LIMIT } },
     });
     if (!conv) {
       res.status(404).json({ error: 'Not found' });
@@ -293,7 +296,7 @@ router.post(
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const chatMode = user?.chatMode ?? false;
     const requestedModel = (model || conv.model || 'auto') as ModelId;
-    const storedMsgs = conv.messages as StoredMessage[];
+    const storedMsgs = [...(conv.messages as StoredMessage[])].reverse();
     const isFirstMessage = storedMsgs.length === 0;
 
     // Reply targeting is a Chat Mode feature; the target must be an existing

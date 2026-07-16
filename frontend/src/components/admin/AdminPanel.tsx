@@ -92,7 +92,7 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-3 p-4 rounded-2xl" style={{ background: 'var(--accent-dim)' }}>
+      <div className="flex items-start gap-3 p-4 rounded-2xl" style={{ background: 'var(--accent-soft)' }}>
         <ShieldCheck size={20} style={{ color: 'var(--accent)' }} className="shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Admin area</p>
@@ -129,7 +129,7 @@ export const AdminPanel: React.FC = () => {
               <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: `${b.color}1f`, color: b.color }}>{b.icon}</span>
               <span className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Max {b.badge}</span>
               {view?.configured ? (
-                <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: '#30d15822', color: '#30d158' }}>Configured</span>
+                <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: '#30a46c22', color: '#30a46c' }}>Configured</span>
               ) : (
                 <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--bg-3)', color: 'var(--text-3)' }}>Not set</span>
               )}
@@ -173,7 +173,7 @@ export const AdminPanel: React.FC = () => {
                       }
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-opacity"
-                    style={{ color: '#ff3b30' }}
+                    style={{ color: '#e5484d' }}
                     title="Clear key"
                   >
                     Clear
@@ -183,7 +183,7 @@ export const AdminPanel: React.FC = () => {
             </div>
 
             {t && t !== 'loading' && (
-              <p className="text-[12px]" style={{ color: t.ok ? '#30d158' : '#ff3b30' }}>
+              <p className="text-[12px]" style={{ color: t.ok ? '#30a46c' : '#e5484d' }}>
                 {t.ok ? '✓ Reachable' : `✗ ${t.error}`}
               </p>
             )}

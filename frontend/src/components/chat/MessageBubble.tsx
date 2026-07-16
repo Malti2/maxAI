@@ -8,6 +8,7 @@ import type { Message } from '../../store/chatStore';
 import type { ModelId } from '../../lib/models';
 import type { ReactionType } from '../../lib/reactions';
 import { ModelBadge } from '../ui/ModelBadge';
+import { Spark } from '../ui/Spark';
 import { TapbackBadge, TapbackPicker } from './Tapback';
 
 /* ── Code block with language label, syntax highlighting + copy ── */
@@ -88,7 +89,7 @@ const ActionButton: React.FC<{ title: string; onClick?: () => void; children: Re
     onClick={onClick}
     title={title}
     aria-label={title}
-    className="p-1.5 rounded-full transition-colors"
+    className="p-1.5 rounded-lg transition-colors"
     style={{ color: 'var(--text-3)' }}
     onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
     onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
@@ -169,7 +170,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   /* ── USER ── */
   if (isUser) {
     return (
-      <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-2' : 'mt-0.5'} ${tail ? 'mb-0.5' : ''} animate-bubble`}>
+      <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-5' : 'mt-1'} ${tail ? 'mb-1' : ''} animate-msg`}>
         {replyTarget && <ReplyPreview target={replyTarget} align="right" />}
         <div className="flex justify-end">
           <div className="flex items-end gap-1.5 max-w-[82%] group">
@@ -201,12 +202,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 />
                 <div className="flex items-center justify-end gap-2 mt-1">
                   <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-lg text-xs font-medium" style={{ color: 'var(--text-2)', background: 'var(--bg-3)' }}>Cancel</button>
-                  <button onClick={saveEdit} className="px-3 py-1 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--accent)' }}>Save & send</button>
+                  <button onClick={saveEdit} className="px-3 py-1 rounded-lg text-xs font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}>Save &amp; send</button>
                 </div>
               </div>
             ) : (
               <div className="relative pb-1">
-                <div className={`bubble bubble-out ${tail ? 'tail' : ''} whitespace-pre-wrap`}>
+                <div className="bubble bubble-user whitespace-pre-wrap">
                   {message.content}
                 </div>
                 {message.reaction && (
@@ -229,50 +230,62 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isThinking = message.streaming && !message.content;
 
   return (
-    <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-2' : 'mt-0.5'} ${tail ? 'mb-0.5' : ''} animate-bubble`}>
-      {replyTarget && <ReplyPreview target={replyTarget} align="left" />}
-      <div className="flex justify-start">
-        <div className="flex items-end gap-1.5 max-w-[86%] group">
-          <div className="relative pb-1 min-w-0">
-            <div className={`bubble bubble-in ${tail ? 'tail' : ''}`}>
-              {isThinking ? (
-                <div className="typing-dots"><span /><span /><span /></div>
-              ) : (
-                <div className={`prose-max ${message.streaming ? 'typing-cursor' : ''}`}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents as never}>
-                    {message.content}
-                  </ReactMarkdown>
-                </div>
-              )}
+    <div className={`flex flex-col px-4 ${firstInGroup ? 'mt-5' : 'mt-2'} ${tail ? 'mb-1' : ''} animate-msg`}>
+      {replyTarget && (
+        <div className="pl-10">
+          <ReplyPreview target={replyTarget} align="left" />
+        </div>
+      )}
+      <div className="flex justify-start gap-3">
+        {/* Max avatar — only at the start of a group, otherwise a spacer keeps alignment */}
+        <div className="w-7 shrink-0 flex justify-center pt-0.5">
+          {firstInGroup && (
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}
+            >
+              <Spark size={16} />
             </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 group">
+          <div className="relative inline-block max-w-full">
+            {isThinking ? (
+              <div className="typing-dots pt-1"><span /><span /><span /></div>
+            ) : (
+              <div className={`prose-max ${message.streaming ? 'typing-cursor' : ''}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents as never}>
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            )}
             {message.reaction && (
               <TapbackBadge reaction={message.reaction} side="right" onClick={() => canReact && setPickerOpen(true)} />
             )}
           </div>
 
-          {/* Hover actions to the right of the bubble */}
+          {/* Meta line + hover actions on the tail message */}
           {!isThinking && !message.streaming && message.content && (
-            <div className="flex items-center self-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 mt-1.5 -ml-1.5">
               <ActionButton title="Copy" onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />}</ActionButton>
               {isLastAssistant && onRegenerate && (
                 <ActionButton title="Regenerate" onClick={onRegenerate}><RefreshCw size={13} /></ActionButton>
               )}
               {chatActions}
+              {tail && message.model && (
+                <div className="flex items-center gap-2 ml-1.5">
+                  <ModelBadge modelId={message.model as ModelId} size="xs" showName={false} />
+                  <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>{timeLabel}</span>
+                  {message.tokens ? (
+                    <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>· {message.tokens.toLocaleString()} tokens</span>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Meta line (model + tokens + time), only on the tail message */}
-      {tail && !message.streaming && message.model && (
-        <div className="flex items-center gap-2 mt-1 pl-1">
-          <ModelBadge modelId={message.model as ModelId} size="xs" showName />
-          <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>{timeLabel}</span>
-          {message.tokens ? (
-            <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>· {message.tokens.toLocaleString()} tokens</span>
-          ) : null}
-        </div>
-      )}
     </div>
   );
 };

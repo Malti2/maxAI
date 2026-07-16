@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { Spark } from '../components/ui/Spark';
 import api from '../lib/api';
 
 type Mode = 'login' | 'register';
@@ -34,29 +35,26 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const fieldStyle = { background: 'var(--bg)', border: '1px solid var(--border-2)', color: 'var(--text-1)' };
+  const fieldStyle = { background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--text-1)' };
   const focusOn = (e: React.FocusEvent<HTMLElement>) => (e.currentTarget.style.borderColor = 'var(--accent)');
   const focusOff = (e: React.FocusEvent<HTMLElement>) => (e.currentTarget.style.borderColor = 'var(--border-2)');
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: 'var(--bg)' }}>
-      <div className="absolute top-[-20%] right-[-10%] w-[520px] h-[520px] rounded-full blur-3xl pointer-events-none opacity-25 dark:opacity-20" style={{ background: 'radial-gradient(circle, #0a84ff, transparent)' }} />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[440px] h-[440px] rounded-full blur-3xl pointer-events-none opacity-20 dark:opacity-15" style={{ background: 'radial-gradient(circle, #5e5ce6, transparent)' }} />
-
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
       <div className="relative w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-[20px] mx-auto mb-4 flex items-center justify-center brand-gradient" style={{ boxShadow: '0 12px 40px rgba(10,132,255,0.4)' }}>
-            <span className="text-white text-2xl font-bold">M</span>
+          <div className="flex justify-center mb-4">
+            <Spark size={44} />
           </div>
-          <h1 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--text-1)' }}>
+          <h1 className="display text-[30px]" style={{ color: 'var(--text-1)' }}>
             {mode === 'login' ? 'Welcome back' : 'Create your account'}
           </h1>
-          <p className="text-sm mt-1.5" style={{ color: 'var(--text-2)' }}>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-2)' }}>
             {mode === 'login' ? 'Sign in to continue to maxAI' : 'Join maxAI and meet Max'}
           </p>
         </div>
 
-        <div className="rounded-3xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}>
+        <div className="rounded-3xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
           <div className="flex p-1 rounded-2xl mb-6" style={{ background: 'var(--bg-3)' }}>
             {(['login', 'register'] as Mode[]).map((m) => (
               <button
@@ -64,7 +62,7 @@ export const AuthPage: React.FC = () => {
                 onClick={() => { setMode(m); setError(''); }}
                 className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
                 style={mode === m
-                  ? { background: 'var(--bg)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }
+                  ? { background: 'var(--surface)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }
                   : { color: 'var(--text-3)', background: 'transparent' }}
               >
                 {m === 'login' ? 'Sign in' : 'Sign up'}
@@ -119,7 +117,7 @@ export const AuthPage: React.FC = () => {
               <AnimatePresence>
                 {error && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                    <div className="px-3.5 py-2.5 rounded-xl text-sm" style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', color: '#ff3b30' }}>
+                    <div className="px-3.5 py-2.5 rounded-xl text-sm" style={{ background: 'color-mix(in srgb, var(--danger) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 22%, transparent)', color: 'var(--danger)' }}>
                       {error}
                     </div>
                   </motion.div>
@@ -128,8 +126,8 @@ export const AuthPage: React.FC = () => {
 
               <button
                 type="submit" disabled={loading}
-                className="w-full py-3 rounded-2xl text-sm font-semibold text-white transition-all mt-1 disabled:opacity-50 brand-gradient"
-                style={{ boxShadow: '0 4px 16px rgba(10,132,255,0.3)' }}
+                className="w-full py-3 rounded-2xl text-sm font-semibold transition-all mt-1 disabled:opacity-50"
+                style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">

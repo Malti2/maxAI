@@ -9,9 +9,9 @@ const ICONS: Record<ToastKind, React.ReactNode> = {
 };
 
 const COLORS: Record<ToastKind, string> = {
-  error: '#ff3b30',
-  success: '#34c759',
-  info: '#0a84ff',
+  error: '#e5484d',
+  success: '#30a46c',
+  info: '#5b57e0',
 };
 
 export const Toaster: React.FC = () => {

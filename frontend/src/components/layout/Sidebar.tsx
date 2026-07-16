@@ -8,6 +8,7 @@ import { useChatStore, type Conversation } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { Avatar } from '../ui/Avatar';
+import { Spark } from '../ui/Spark';
 import api from '../../lib/api';
 import { isToday, isYesterday, subDays, isAfter } from 'date-fns';
 
@@ -105,22 +106,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
     const isActive = activeConversationId === conv.id;
     return (
       <div onClick={() => selectConv(conv.id)} className={`conv-item group ${isActive ? 'active' : ''}`}>
-        <div className="w-9 h-9 rounded-full brand-gradient flex items-center justify-center shrink-0 shadow-sm">
-          <span className="text-white text-[13px] font-bold">M</span>
-        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             {conv.pinned && <Pin size={10} style={{ color: 'var(--text-3)' }} className="shrink-0" />}
-            <p className="text-[13.5px] truncate flex-1" style={{ color: 'var(--text-1)', fontWeight: 550 }}>
+            <p
+              className="text-[13.5px] truncate flex-1"
+              style={{ color: isActive ? 'var(--text-1)' : 'var(--text-2)', fontWeight: isActive ? 600 : 500 }}
+            >
               {conv.title}
             </p>
-            <span className="text-[11px] shrink-0" style={{ color: 'var(--text-3)' }}>
+            <span className="text-[10.5px] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-3)' }}>
               {shortTime(conv.updatedAt)}
             </span>
           </div>
-          <p className="text-[12px] truncate mt-0.5" style={{ color: 'var(--text-3)' }}>
-            {conv.preview || 'New conversation'}
-          </p>
         </div>
 
         <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -152,8 +150,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
               <button
                 onClick={(e) => handleDelete(e, conv.id)}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left"
-                style={{ color: '#ff3b30' }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(255,59,48,0.08)')}
+                style={{ color: 'var(--danger)' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--danger) 10%, transparent)')}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
               >
                 <Trash2 size={13} /> Delete
@@ -169,20 +167,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   if (!sidebarOpen) {
     return (
       <div
-        className="flex flex-col items-center py-4 gap-3 w-14 h-full shrink-0"
+        className="flex flex-col items-center py-4 gap-2 w-14 h-full shrink-0"
         style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
       >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-xl transition-colors"
-          style={{ color: 'var(--accent)' }}
+          className="p-2 rounded-lg transition-colors"
+          style={{ color: 'var(--text-2)' }}
           aria-label="Open sidebar"
         >
           <PanelLeft size={19} />
         </button>
         <button
           onClick={onNewChat}
-          className="w-9 h-9 rounded-full brand-gradient flex items-center justify-center text-white shadow-sm"
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105"
+          style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
           aria-label="New chat"
           title="New chat (⌘K)"
         >
@@ -195,42 +194,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   /* ── Full ── */
   return (
     <div
-      className="flex flex-col w-[280px] h-full shrink-0 animate-slide-left"
+      className="flex flex-col w-[272px] h-full shrink-0 animate-slide-left"
       style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
     >
-      <div className="flex items-center gap-2 px-3.5 pt-4 pb-2">
+      <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-7 h-7 rounded-lg brand-gradient flex items-center justify-center shrink-0 shadow-sm">
-            <span className="text-white text-[12px] font-bold">M</span>
-          </div>
-          <span className="font-semibold text-[17px] tracking-tight" style={{ color: 'var(--text-1)' }}>maxAI</span>
+          <Spark size={22} />
+          <span className="display text-[19px]" style={{ color: 'var(--text-1)' }}>maxAI</span>
         </div>
-        <button
-          onClick={onNewChat}
-          className="p-1.5 rounded-lg transition-colors"
-          style={{ color: 'var(--accent)' }}
-          aria-label="New chat"
-          title="New chat (⌘K)"
-        >
-          <SquarePen size={18} />
-        </button>
         <button
           onClick={() => setSidebarOpen(false)}
           className="p-1.5 rounded-lg transition-colors"
           style={{ color: 'var(--text-3)' }}
           aria-label="Close sidebar"
+          title="Collapse sidebar (⌘B)"
         >
           <PanelLeftClose size={17} />
         </button>
       </div>
 
-      <div className="px-3 mb-1.5">
+      <div className="px-3 pt-1 pb-1">
+        <button
+          onClick={onNewChat}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border)')}
+        >
+          <SquarePen size={16} style={{ color: 'var(--accent)' }} />
+          New chat
+        </button>
+      </div>
+
+      <div className="px-3 mb-1.5 mt-1">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
+            placeholder="Search chats"
             className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] focus:outline-none transition-colors"
             style={{ background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid transparent' }}
             onFocus={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)')}
@@ -246,14 +248,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
             <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
               {search ? 'No results' : 'No conversations yet'}
             </p>
-            {!search && (
-              <button
-                onClick={onNewChat}
-                className="mt-3 px-3.5 py-1.5 rounded-full text-[13px] font-medium text-white brand-gradient"
-              >
-                Start chatting
-              </button>
-            )}
           </div>
         ) : (
           <>

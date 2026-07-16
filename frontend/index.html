@@ -4,12 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a84ff" />
-    <title>maxAI – Your personal AI assistant</title>
-    <meta name="description" content="maxAI – your personal AI platform with Max, your assistant across multiple models and personalities" />
+    <meta name="theme-color" content="#5b57e0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d0d10" media="(prefers-color-scheme: dark)" />
+    <title>maxAI — Your personal AI assistant</title>
+    <meta name="description" content="maxAI — your personal AI platform with Max, your assistant across multiple models and personalities." />
+    <meta property="og:title" content="maxAI — Your personal AI assistant" />
+    <meta property="og:description" content="Your personal AI platform with Max, your assistant across multiple models and personalities." />
+    <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong colours.
+      (function () {
+        try {
+          var raw = localStorage.getItem('max-theme');
+          var theme = raw ? (JSON.parse(raw).state || {}).theme : 'system';
+          var dark = theme === 'dark' ||
+            ((!theme || theme === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

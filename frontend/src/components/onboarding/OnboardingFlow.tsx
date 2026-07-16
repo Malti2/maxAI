@@ -4,11 +4,12 @@ import { Check, ArrowRight, MessageCircle } from 'lucide-react';
 import { MODELS } from '../../lib/models';
 import { PERSONALITIES, DEFAULT_PERSONALITY, type PersonalityId } from '../../lib/personalities';
 import { useAuthStore } from '../../store/authStore';
+import { Spark } from '../ui/Spark';
 import api from '../../lib/api';
 
 const AVATAR_COLORS = [
-  '#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f',
-  '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff',
+  '#5b57e0', '#7c6cf0', '#bf5af2', '#e5484d',
+  '#dd8a2b', '#e0b21f', '#30a46c', '#3aa0d8',
 ];
 
 interface OnboardingFlowProps {
@@ -77,14 +78,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       case 'welcome':
         return (
           <div className="text-center space-y-4">
-            <div
-              className="w-20 h-20 rounded-[24px] mx-auto flex items-center justify-center brand-gradient"
-              style={{ boxShadow: '0 12px 40px rgba(10,132,255,0.4)' }}
-            >
-              <span className="text-white text-3xl font-bold">M</span>
+            <div className="flex justify-center" style={{ animation: 'spark-pulse 4s ease-in-out infinite' }}>
+              <Spark size={56} />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold mb-2" style={{ color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
+              <h2 className="display text-[28px] mb-2" style={{ color: 'var(--text-1)' }}>
                 Welcome to maxAI
               </h2>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-2)' }}>
@@ -241,12 +239,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
               style={{
                 borderColor: chatMode ? 'var(--accent)' : 'var(--border)',
-                background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)',
+                background: chatMode ? 'var(--accent-soft)' : 'var(--bg-3)',
               }}
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
+                style={{ background: chatMode ? 'var(--accent-soft)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
               >
                 <MessageCircle size={17} />
               </div>
@@ -255,7 +253,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                   <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Chat Mode</span>
                   <span
                     className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
-                    style={{ background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
+                    style={{ background: chatMode ? 'var(--accent-soft)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}
                   >
                     {chatMode ? 'On' : 'Off'}
                   </span>
@@ -266,7 +264,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               </div>
               <div
                 className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
-                style={{ background: chatMode ? '#30d158' : 'var(--border-2)' }}
+                style={{ background: chatMode ? '#30a46c' : 'var(--border-2)' }}
               >
                 <div
                   className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
@@ -329,15 +327,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'var(--bg)' }}
     >
-      <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, #0a84ff, transparent)' }} />
-      <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, #5e5ce6, transparent)' }} />
-
       <div
         className="relative w-full max-w-md rounded-3xl overflow-hidden"
         style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xl)' }}
       >
         <div className="h-1" style={{ background: 'var(--bg-3)' }}>
-          <div className="h-full transition-all duration-500 brand-gradient" style={{ width: `${progress}%` }} />
+          <div className="h-full transition-all duration-500" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
         </div>
 
         <div className="p-8">
@@ -393,7 +388,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               <button
                 onClick={next}
                 disabled={!canProceed}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 brand-gradient"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+                style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
               >
                 {step === 0 ? "Let's go" : 'Next'}
                 <ArrowRight size={14} />
@@ -402,7 +398,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               <button
                 onClick={handleComplete}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 brand-gradient"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
               >
                 {saving ? (
                   <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
