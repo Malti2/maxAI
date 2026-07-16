@@ -11,9 +11,14 @@ that speaks the standard Chat Completions API.
   the right tier automatically based on the request).
 - **3 personalities**: Casual (relaxed & direct), Assistant (balanced) and
   Professional (formal), each layered on top of an optional custom instruction.
-- **Polished chat UI**: message bubbles with tails on both sides, tapback
-  reactions, replies, a typing indicator, delivered receipts, date separators
-  and optional synthesised send/receive sounds — in light & dark.
+- **Minimalist interface**: a calm, typographic design with its own iris accent
+  and a Fraunces serif for display — quiet surfaces, generous space, light &
+  dark. The home screen opens with a time-of-day greeting instead of a static
+  welcome line.
+- **Clean chat**: your messages sit in quiet cards; Max replies as readable
+  prose with live Markdown, syntax highlighting and a typing indicator. Tapback
+  reactions, replies and date separators are all supported, with optional
+  synthesised send/receive sounds.
 - **Chat Mode**: message-by-message chatting with queued messages, tapback
   reactions and replies.
 - **Regenerate & edit**: re-roll Max's last answer, or edit one of your messages
@@ -101,9 +106,11 @@ sync with your public `https://` address.
 ```
 ├── frontend/        React + TypeScript + Tailwind CSS (Vite)
 │   ├── src/
-│   │   ├── components/  chat/, layout/, ui/, admin/ (AdminPanel)
+│   │   ├── components/  chat/ (Home, MessageBubble, ChatInput, Tapback),
+│   │   │                layout/, ui/ (Spark, ErrorBoundary, …), admin/
 │   │   ├── hooks/       useChat.ts (shared SSE send/regenerate/edit)
-│   │   ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts, sounds.ts
+│   │   ├── lib/         api.ts, models.ts, personalities.ts, reactions.ts,
+│   │   │                sounds.ts, greeting.ts (time-of-day greeting)
 │   │   └── store/       auth, chat, theme, toast (Zustand)
 │   └── nginx.conf   serves the SPA and reverse-proxies /api to the backend
 ├── backend/         Node.js + Express + TypeScript

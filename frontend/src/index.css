@@ -326,6 +326,15 @@ body { margin: 0; background: var(--bg); color: var(--text-1); }
   outline-offset: 2px;
 }
 
+/* Keyboard-only focus ring for interactive elements. Uses :where() so it never
+   raises specificity over component styles, and only shows for keyboard users
+   (not mouse clicks). */
+:where(button, a, [role="button"], summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
 /* ── Transitions (interactive only) ───────────── */
 button, a, input, textarea, select {
   transition-property: background-color, color, border-color, opacity, box-shadow, transform;
