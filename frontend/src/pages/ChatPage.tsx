@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { Menu, ChevronDown } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { PanelLeft, ChevronDown, SquarePen } from 'lucide-react';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
-import { EmptyState } from '../components/chat/EmptyState';
+import { Home } from '../components/chat/Home';
 import { useChatStore, type Message } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import { useChat } from '../hooks/useChat';
@@ -33,7 +33,7 @@ function formatSeparator(date: Date): string {
 }
 
 const DateSeparator: React.FC<{ label: string }> = ({ label }) => (
-  <div className="flex justify-center my-3">
+  <div className="flex justify-center my-4">
     <span className="text-[11px] font-medium px-2" style={{ color: 'var(--text-3)' }}>
       {label}
     </span>
@@ -42,6 +42,7 @@ const DateSeparator: React.FC<{ label: string }> = ({ label }) => (
 
 export const ChatPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const {
     messages, setMessages, activeConversationId, setActiveConversation,
     conversations, sidebarOpen, setSidebarOpen, isStreaming,
@@ -135,121 +136,141 @@ export const ChatPage: React.FC = () => {
 
   const activeConv = conversations.find((c) => c.id === (id || activeConversationId));
   const messageById = new Map(messages.map((m) => [m.id, m]));
+  const isHome = !loading && messages.length === 0;
+
+  const newChat = () => {
+    setActiveConversation(null);
+    setMessages([]);
+    setInput('');
+    navigate('/chat');
+  };
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Header — contact bar */}
+      {/* Slim top bar */}
       <div
-        className="glass flex items-center gap-3 px-3 py-2.5 shrink-0 z-10"
-        style={{ borderBottom: '1px solid var(--border)' }}
+        className="flex items-center gap-2 px-3 py-2.5 shrink-0 z-10"
+        style={{ minHeight: '52px', borderBottom: isHome ? '1px solid transparent' : '1px solid var(--border)' }}
       >
-        <div className="w-9 flex justify-start">
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-full transition-colors"
-              style={{ color: 'var(--accent)' }}
-              aria-label="Open sidebar"
-            >
-              <Menu size={20} />
-            </button>
-          )}
-        </div>
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-2)' }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+            aria-label="Open sidebar"
+          >
+            <PanelLeft size={18} />
+          </button>
+        )}
 
-        <div className="flex-1 min-w-0 flex flex-col items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full brand-gradient flex items-center justify-center shadow-sm">
-              <span className="text-white text-[11px] font-bold">M</span>
-            </div>
-            <span className="text-[15px] font-semibold" style={{ color: 'var(--text-1)' }}>Max</span>
-            {activeConv && <ModelBadge modelId={activeConv.model as ModelId} size="xs" showName={false} />}
-          </div>
-          {activeConv?.title && activeConv.title !== 'New conversation' && (
-            <p className="text-[11px] truncate max-w-[60vw]" style={{ color: 'var(--text-3)' }}>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          {!isHome && activeConv?.title && activeConv.title !== 'New conversation' && (
+            <span className="text-[14px] font-medium truncate" style={{ color: 'var(--text-1)' }}>
               {activeConv.title}
-            </p>
+            </span>
           )}
+          {!isHome && activeConv && <ModelBadge modelId={activeConv.model as ModelId} size="xs" showName={false} />}
         </div>
 
-        <div className="w-9" />
-      </div>
-
-      {/* Messages */}
-      <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="loader-dots"><span /><span /><span /></div>
-          </div>
-        ) : messages.length === 0 ? (
-          <EmptyState onSuggestion={(text) => setInput(text)} />
-        ) : (
-          <div className="py-3 max-w-3xl mx-auto w-full">
-            {messages.map((m, i) => {
-              const prev = messages[i - 1];
-              const next = messages[i + 1];
-              const prevTime = prev ? new Date(prev.createdAt).getTime() : 0;
-              const curTime = new Date(m.createdAt).getTime();
-              const nextTime = next ? new Date(next.createdAt).getTime() : 0;
-
-              const firstInGroup = !prev || prev.role !== m.role || curTime - prevTime > GROUP_GAP_MS;
-              const tail = !next || next.role !== m.role || nextTime - curTime > GROUP_GAP_MS;
-              const showSeparator = !prev || curTime - prevTime > SEPARATOR_GAP_MS;
-
-              const isLast = i === messages.length - 1;
-              const isLastAssistant = isLast && m.role === 'assistant' && !m.streaming;
-              const showDelivered = isLast && !isStreaming && m.role === 'user' && !m.pending;
-
-              return (
-                <React.Fragment key={m.id}>
-                  {showSeparator && <DateSeparator label={formatSeparator(new Date(m.createdAt))} />}
-                  <MessageBubble
-                    message={m}
-                    chatModeEnabled={chatModeEnabled}
-                    replyTarget={m.replyToId ? messageById.get(m.replyToId) ?? null : null}
-                    firstInGroup={firstInGroup}
-                    tail={tail}
-                    isLastAssistant={isLastAssistant}
-                    onReact={(reaction) => handleReact(m.id, reaction)}
-                    onReply={() => setReplyingTo(m)}
-                    onRegenerate={regenerate}
-                    onEdit={(content) => editMessage(m.id, content)}
-                  />
-                  {showDelivered && (
-                    <div className="flex justify-end px-5 mt-0.5">
-                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-3)' }}>Delivered</span>
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
-            <div ref={messagesEndRef} className="h-4" />
-          </div>
+        {!isHome && (
+          <button
+            onClick={newChat}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-2)' }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+            aria-label="New chat"
+            title="New chat (⌘K)"
+          >
+            <SquarePen size={17} />
+          </button>
         )}
       </div>
 
-      {/* Scroll to bottom */}
-      {showScrollBtn && (
-        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-20 animate-fade-in">
-          <button
-            onClick={() => scrollToBottom()}
-            className="flex items-center justify-center w-9 h-9 rounded-full transition-all hover:scale-105 glass"
-            style={{ border: '1px solid var(--border-2)', color: 'var(--accent)', boxShadow: 'var(--shadow)' }}
-            aria-label="Scroll to bottom"
-          >
-            <ChevronDown size={18} />
-          </button>
+      {/* Body */}
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="loader-dots"><span /><span /><span /></div>
         </div>
-      )}
+      ) : isHome ? (
+        <div ref={containerRef} className="flex-1 overflow-y-auto">
+          <Home
+            input={input}
+            setInput={setInput}
+            onSend={handleSend}
+            onStop={stopStreaming}
+            chatModeEnabled={chatModeEnabled}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
+          />
+        </div>
+      ) : (
+        <>
+          <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+            <div className="py-4 max-w-3xl mx-auto w-full">
+              {messages.map((m, i) => {
+                const prev = messages[i - 1];
+                const next = messages[i + 1];
+                const prevTime = prev ? new Date(prev.createdAt).getTime() : 0;
+                const curTime = new Date(m.createdAt).getTime();
+                const nextTime = next ? new Date(next.createdAt).getTime() : 0;
 
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSend={handleSend}
-        onStop={stopStreaming}
-        chatModeEnabled={chatModeEnabled}
-        replyingTo={replyingTo}
-        onCancelReply={() => setReplyingTo(null)}
-      />
+                const firstInGroup = !prev || prev.role !== m.role || curTime - prevTime > GROUP_GAP_MS;
+                const tail = !next || next.role !== m.role || nextTime - curTime > GROUP_GAP_MS;
+                const showSeparator = !prev || curTime - prevTime > SEPARATOR_GAP_MS;
+
+                const isLast = i === messages.length - 1;
+                const isLastAssistant = isLast && m.role === 'assistant' && !m.streaming;
+
+                return (
+                  <React.Fragment key={m.id}>
+                    {showSeparator && <DateSeparator label={formatSeparator(new Date(m.createdAt))} />}
+                    <MessageBubble
+                      message={m}
+                      chatModeEnabled={chatModeEnabled}
+                      replyTarget={m.replyToId ? messageById.get(m.replyToId) ?? null : null}
+                      firstInGroup={firstInGroup}
+                      tail={tail}
+                      isLastAssistant={isLastAssistant}
+                      onReact={(reaction) => handleReact(m.id, reaction)}
+                      onReply={() => setReplyingTo(m)}
+                      onRegenerate={regenerate}
+                      onEdit={(content) => editMessage(m.id, content)}
+                    />
+                  </React.Fragment>
+                );
+              })}
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+          </div>
+
+          {/* Scroll to bottom */}
+          {showScrollBtn && (
+            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-20 animate-fade-in">
+              <button
+                onClick={() => scrollToBottom()}
+                className="flex items-center justify-center w-9 h-9 rounded-full transition-all hover:scale-105 glass"
+                style={{ border: '1px solid var(--border-2)', color: 'var(--text-1)', boxShadow: 'var(--shadow)' }}
+                aria-label="Scroll to bottom"
+              >
+                <ChevronDown size={18} />
+              </button>
+            </div>
+          )}
+
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={handleSend}
+            onStop={stopStreaming}
+            chatModeEnabled={chatModeEnabled}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
+          />
+        </>
+      )}
     </div>
   );
 };

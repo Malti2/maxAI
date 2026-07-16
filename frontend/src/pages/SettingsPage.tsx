@@ -17,8 +17,8 @@ import api from '../lib/api';
 import type { ModelId } from '../lib/models';
 
 const AVATAR_COLORS = [
-  '#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f',
-  '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff',
+  '#5b57e0', '#7c6cf0', '#bf5af2', '#e5484d',
+  '#dd8a2b', '#e0b21f', '#30a46c', '#3aa0d8',
 ];
 
 type Section = 'profile' | 'appearance' | 'models' | 'data' | 'admin';
@@ -39,7 +39,7 @@ const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void; is
           onClick={() => onChange(item.id)}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors text-left"
           style={{
-            background: active === item.id ? 'var(--accent-dim)' : 'transparent',
+            background: active === item.id ? 'var(--accent-soft)' : 'transparent',
             color: active === item.id ? 'var(--accent)' : 'var(--text-2)',
             fontWeight: active === item.id ? 600 : 450,
           }}
@@ -57,7 +57,7 @@ const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void; is
 const Toggle: React.FC<{ on: boolean }> = ({ on }) => (
   <div
     className="relative shrink-0 w-[46px] h-[28px] rounded-full transition-all duration-200"
-    style={{ background: on ? '#30d158' : 'var(--border-2)' }}
+    style={{ background: on ? '#30a46c' : 'var(--border-2)' }}
   >
     <div
       className="absolute top-[2px] w-6 h-6 rounded-full bg-white shadow transition-all duration-200"
@@ -229,7 +229,7 @@ export const SettingsPage: React.FC = () => {
                     key={value}
                     onClick={() => setTheme(value as 'light' | 'dark' | 'system')}
                     className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left"
-                    style={{ borderColor: theme === value ? 'var(--accent)' : 'var(--border)', background: theme === value ? 'var(--accent-dim)' : 'var(--bg)' }}
+                    style={{ borderColor: theme === value ? 'var(--accent)' : 'var(--border)', background: theme === value ? 'var(--accent-soft)' : 'var(--bg)' }}
                   >
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}>{icon}</div>
                     <div className="flex-1">
@@ -252,9 +252,9 @@ export const SettingsPage: React.FC = () => {
                   if (next) playReceive();
                 }}
                 className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
-                style={{ borderColor: soundEnabled ? 'var(--accent)' : 'var(--border)', background: soundEnabled ? 'var(--accent-dim)' : 'var(--bg)' }}
+                style={{ borderColor: soundEnabled ? 'var(--accent)' : 'var(--border)', background: soundEnabled ? 'var(--accent-soft)' : 'var(--bg)' }}
               >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: soundEnabled ? 'var(--accent-dim)' : 'var(--bg-3)', color: soundEnabled ? 'var(--accent)' : 'var(--text-3)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: soundEnabled ? 'var(--accent-soft)' : 'var(--bg-3)', color: soundEnabled ? 'var(--accent)' : 'var(--text-3)' }}>
                   <Volume2 size={18} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -277,9 +277,9 @@ export const SettingsPage: React.FC = () => {
               <button
                 onClick={() => setChatMode((v) => !v)}
                 className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
-                style={{ borderColor: chatMode ? 'var(--accent)' : 'var(--border)', background: chatMode ? 'var(--accent-dim)' : 'var(--bg)' }}
+                style={{ borderColor: chatMode ? 'var(--accent)' : 'var(--border)', background: chatMode ? 'var(--accent-soft)' : 'var(--bg)' }}
               >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: chatMode ? 'var(--accent-dim)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: chatMode ? 'var(--accent-soft)' : 'var(--bg-3)', color: chatMode ? 'var(--accent)' : 'var(--text-3)' }}>
                   <MessageCircle size={17} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -349,13 +349,13 @@ export const SettingsPage: React.FC = () => {
                 <button
                   onClick={() => setDeleteConfirm(true)}
                   className="px-3.5 py-2 rounded-xl text-sm font-medium transition-colors"
-                  style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', color: '#ff3b30' }}
+                  style={{ background: 'color-mix(in srgb, var(--danger) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 22%, transparent)', color: 'var(--danger)' }}
                 >
                   Delete history
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button onClick={handleDeleteAll} className="px-3.5 py-2 rounded-xl text-sm font-medium text-white" style={{ background: '#ff3b30' }}>Yes, delete</button>
+                  <button onClick={handleDeleteAll} className="px-3.5 py-2 rounded-xl text-sm font-medium text-white" style={{ background: 'var(--danger)' }}>Yes, delete</button>
                   <button onClick={() => setDeleteConfirm(false)} className="px-3.5 py-2 rounded-xl text-sm font-medium" style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}>Cancel</button>
                 </div>
               )}

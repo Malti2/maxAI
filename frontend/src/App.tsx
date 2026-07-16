@@ -7,6 +7,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { AppLayout } from './components/layout/AppLayout';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { Toaster } from './components/ui/Toaster';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore, applyTheme } from './store/themeStore';
 import { setSoundEnabled } from './lib/sounds';
@@ -57,11 +58,13 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-        <Toaster />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

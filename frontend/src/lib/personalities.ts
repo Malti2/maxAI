@@ -28,7 +28,7 @@ export const PERSONALITIES: PersonalityConfig[] = [
     tagline: 'Balanced & helpful',
     description: 'Friendly and clear with clean formatting. The recommended default.',
     icon: Sparkles,
-    color: '#0a84ff',
+    color: '#5b57e0',
   },
   {
     id: 'professional',

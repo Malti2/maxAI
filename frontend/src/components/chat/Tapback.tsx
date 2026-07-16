@@ -20,7 +20,7 @@ export const TapbackBadge: React.FC<TapbackBadgeProps> = ({ reaction, side, onCl
       aria-label={`Tapback: ${config.label}`}
       className="absolute -top-3 flex items-center justify-center w-7 h-7 rounded-full text-[13px] shadow-sm transition-transform hover:scale-110 animate-scale-in"
       style={{
-        background: 'var(--bubble-in)',
+        background: 'var(--bg-2)',
         border: '2px solid var(--bg)',
         [side]: '-10px',
       } as React.CSSProperties}
@@ -63,7 +63,7 @@ export const TapbackPicker: React.FC<TapbackPickerProps> = ({ current, onPick, o
             title={r.label}
             aria-label={r.label}
             className="w-8 h-8 flex items-center justify-center rounded-full text-base transition-all hover:scale-125"
-            style={{ background: active ? 'var(--accent-dim)' : 'transparent' }}
+            style={{ background: active ? 'var(--accent-soft)' : 'transparent' }}
           >
             {r.emoji}
           </button>

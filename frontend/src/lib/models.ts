@@ -16,7 +16,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Auto',
     description: 'Automatically picks the best model',
-    color: '#30d158', // green
+    color: '#30a46c', // green
     icon: '✦',
   },
   {
@@ -24,7 +24,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Lite',
     description: 'Fast & efficient for everyday tasks',
-    color: '#5ac8fa', // light blue
+    color: '#3aa0d8', // sky
     icon: '◈',
   },
   {
@@ -32,7 +32,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Pro',
     description: 'Powerful for complex tasks',
-    color: '#5e5ce6', // indigo
+    color: '#5b57e0', // iris
     icon: '◆',
   },
   {
@@ -40,7 +40,7 @@ export const MODELS: ModelConfig[] = [
     name: 'Max',
     badge: 'Beast',
     description: 'Maximum performance for the most demanding tasks',
-    color: '#ff9f0a', // orange
+    color: '#dd8a2b', // amber
     icon: '⬡',
   },
 ];

@@ -6,7 +6,7 @@ interface AvatarProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ name, color = '#0a84ff', size = 'md' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ name, color = '#5b57e0', size = 'md' }) => {
   const initials = name
     ? name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
