@@ -46,10 +46,10 @@ export const ChatPage: React.FC = () => {
   const {
     messages, setMessages, activeConversationId, setActiveConversation,
     conversations, sidebarOpen, setSidebarOpen, isStreaming,
-    enqueuePending, addMessage, setMessageReaction,
+    enqueuePending, addMessage, setMessageReaction, pendingQueue,
   } = useChatStore();
   const { user } = useAuthStore();
-  const { sendMessage, regenerate, editMessage, stopStreaming } = useChat();
+  const { sendMessage, regenerate, editMessage, stopStreaming, flushQueue } = useChat();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -81,6 +81,15 @@ export const ChatPage: React.FC = () => {
   useEffect(() => {
     if (isStreaming) scrollToBottom();
   }, [messages, isStreaming, scrollToBottom]);
+
+  // Chat Mode: once Max finishes a turn, deliver any messages the user queued
+  // while it was answering. Without this the queued messages would sit on
+  // screen as "pending" forever, only leaving when the user sent another one.
+  useEffect(() => {
+    if (chatModeEnabled && !isStreaming && pendingQueue.length > 0) {
+      void flushQueue();
+    }
+  }, [chatModeEnabled, isStreaming, pendingQueue, flushQueue]);
 
   useEffect(() => {
     if (id) scrollToBottom('instant');

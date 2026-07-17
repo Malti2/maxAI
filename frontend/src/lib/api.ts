@@ -6,16 +6,36 @@ const api = axios.create({
   withCredentials: true,
 });
 
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = [];
+// Single-flight refresh shared by the axios interceptor *and* the raw `fetch`
+// used for streaming (SSE) in useChat. Concurrent 401s therefore trigger at
+// most one refresh call, and the streaming path — which bypasses axios — can
+// recover from an expired access token exactly like a normal request.
+let refreshPromise: Promise<string | null> | null = null;
 
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach(({ resolve, reject }) => {
-    if (error) reject(error);
-    else resolve(token!);
-  });
-  failedQueue = [];
-};
+export function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = useAuthStore.getState().refreshToken;
+      if (!refreshToken) {
+        useAuthStore.getState().logout();
+        return null;
+      }
+      try {
+        // Call the endpoint directly (not through `api`) so this request never
+        // re-enters the 401 interceptor and loops.
+        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
+        return data.accessToken as string;
+      } catch {
+        useAuthStore.getState().logout();
+        return null;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
@@ -27,38 +47,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        });
-      }
-
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
-      isRefreshing = true;
-
-      const refreshToken = useAuthStore.getState().refreshToken;
-      if (!refreshToken) {
-        useAuthStore.getState().logout();
-        return Promise.reject(error);
-      }
-
-      try {
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
-        useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
-        processQueue(null, data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-        return api(originalRequest);
-      } catch (err) {
-        processQueue(err, null);
-        useAuthStore.getState().logout();
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
+      const token = await refreshAccessToken();
+      if (!token) return Promise.reject(error);
+      originalRequest.headers.Authorization = `Bearer ${token}`;
+      return api(originalRequest);
     }
     return Promise.reject(error);
   }

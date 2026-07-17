@@ -4,7 +4,37 @@ import { useChatStore, type Message } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import { toast } from '../store/toastStore';
 import { playSend, playReceive } from '../lib/sounds';
-import api from '../lib/api';
+import api, { refreshAccessToken } from '../lib/api';
+
+// Fetch an SSE endpoint with the current access token, transparently refreshing
+// it once on a 401. The streaming endpoints use raw `fetch` (EventSource can't
+// send an Authorization header), so they can't rely on the axios interceptor —
+// this mirrors that refresh-and-retry behaviour for the streaming path, so a
+// message sent after the short-lived access token has expired still goes
+// through instead of failing.
+async function authedFetch(
+  url: string,
+  method: 'POST' | 'PUT',
+  body: Record<string, unknown>
+): Promise<Response> {
+  const send = (token: string | null) =>
+    fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+  const token = useAuthStore.getState().accessToken;
+  const response = await send(token);
+  if (response.status !== 401) return response;
+
+  const fresh = await refreshAccessToken();
+  if (!fresh) return response;
+  return send(fresh);
+}
 
 interface SendOptions {
   replyToId?: string | null;
@@ -33,7 +63,6 @@ export function useChat() {
     updateConversation,
     clearPendingQueue,
   } = useChatStore();
-  const { accessToken } = useAuthStore();
   const navigate = useNavigate();
   const abortRef = useRef<(() => void) | null>(null);
 
@@ -47,14 +76,7 @@ export function useChat() {
       let receivedFirstDelta = false;
 
       try {
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(body),
-        });
+        const response = await authedFetch(url, method, body);
 
         if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
 
@@ -165,7 +187,7 @@ export function useChat() {
         setStreaming(false);
       }
     },
-    [accessToken, setStreaming, updateConversation]
+    [setStreaming, updateConversation]
   );
 
   // ── Send a new message ────────────────────────────────────────────
@@ -227,6 +249,49 @@ export function useChat() {
     },
     [activeConversationId, selectedModel, navigate, addConversation, setActiveConversation, addMessage, clearPendingQueue, runStream]
   );
+
+  // ── Deliver queued Chat Mode messages ──────────────────────────────
+  // In Chat Mode the user can keep typing while Max is still answering; those
+  // messages are shown immediately as "pending" and buffered in pendingQueue.
+  // Once the current turn finishes, this delivers the whole buffer as a single
+  // follow-up turn — the first queued message is the primary content and the
+  // rest ride along as pendingMessages — so Max answers all of them together
+  // and in order (see ChatPage, which calls this when streaming ends).
+  const flushQueue = useCallback(async () => {
+    const store = useChatStore.getState();
+    const convId = store.activeConversationId;
+    if (!convId || store.isStreaming) return;
+
+    const queue = [...store.pendingQueue];
+    if (queue.length === 0) return;
+    clearPendingQueue();
+
+    const [primary, ...rest] = queue;
+    const tempAssistantId = `temp-assistant-${Date.now()}`;
+    // The queued messages are already on screen as pending bubbles; runStream's
+    // "done" handler reconciles them with their persisted counterparts. We only
+    // need to add the assistant placeholder here.
+    store.addMessage({
+      id: tempAssistantId,
+      role: 'assistant',
+      content: '',
+      streaming: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    await runStream({
+      url: `/api/chat/conversations/${convId}/messages`,
+      method: 'POST',
+      body: {
+        content: primary,
+        model: store.selectedModel,
+        ...(rest.length > 0 ? { pendingMessages: rest } : {}),
+      },
+      convId,
+      tempIds: [tempAssistantId],
+      assistantTempId: tempAssistantId,
+    });
+  }, [clearPendingQueue, runStream]);
 
   // ── Regenerate the last assistant reply ────────────────────────────
   const regenerate = useCallback(async () => {
@@ -299,5 +364,5 @@ export function useChat() {
       .forEach((m) => store.patchMessage(m.id, { streaming: false }));
   }, [setStreaming]);
 
-  return { sendMessage, regenerate, editMessage, stopStreaming };
+  return { sendMessage, regenerate, editMessage, stopStreaming, flushQueue };
 }
