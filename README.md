@@ -86,6 +86,7 @@ docker compose up -d --build
 | `JWT_SECRET` | Random key (`openssl rand -hex 64`) |
 | `ENCRYPTION_KEY` | Optional; encrypts admin-set keys (derived from `JWT_SECRET` if unset) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | The single admin account, seeded on first boot |
+| `ALLOW_REGISTRATION` | Set to `false` to disable self-service sign-up (default `true`) |
 | `PORT` | Public port maxAI is served on (default `80`) |
 | `FRONTEND_URL` | Public URL / domain (used for CORS) |
 | `AI_BASE_URL` / `AI_API_KEY` | Global provider base URL + key |

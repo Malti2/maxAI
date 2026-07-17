@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -15,7 +15,19 @@ export const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [allowRegistration, setAllowRegistration] = useState(true);
   const { setAuth } = useAuthStore();
+
+  // The server can disable self-service sign-up; hide it when it does.
+  useEffect(() => {
+    api.get('/auth/config')
+      .then(({ data }) => setAllowRegistration(data.allowRegistration !== false))
+      .catch(() => { /* keep the default (allowed) if the check fails */ });
+  }, []);
+
+  useEffect(() => {
+    if (!allowRegistration && mode === 'register') setMode('login');
+  }, [allowRegistration, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,20 +67,22 @@ export const AuthPage: React.FC = () => {
         </div>
 
         <div className="rounded-3xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
-          <div className="flex p-1 rounded-2xl mb-6" style={{ background: 'var(--bg-3)' }}>
-            {(['login', 'register'] as Mode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => { setMode(m); setError(''); }}
-                className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
-                style={mode === m
-                  ? { background: 'var(--surface)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }
-                  : { color: 'var(--text-3)', background: 'transparent' }}
-              >
-                {m === 'login' ? 'Sign in' : 'Sign up'}
-              </button>
-            ))}
-          </div>
+          {allowRegistration && (
+            <div className="flex p-1 rounded-2xl mb-6" style={{ background: 'var(--bg-3)' }}>
+              {(['login', 'register'] as Mode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m); setError(''); }}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={mode === m
+                    ? { background: 'var(--surface)', color: 'var(--text-1)', boxShadow: 'var(--shadow-sm)' }
+                    : { color: 'var(--text-3)', background: 'transparent' }}
+                >
+                  {m === 'login' ? 'Sign in' : 'Sign up'}
+                </button>
+              ))}
+            </div>
+          )}
 
           <AnimatePresence mode="wait">
             <motion.form
@@ -143,15 +157,17 @@ export const AuthPage: React.FC = () => {
           </AnimatePresence>
         </div>
 
-        <p className="text-center text-sm mt-4" style={{ color: 'var(--text-3)' }}>
-          {mode === 'login' ? "Don't have an account?" : 'Already registered?'}{' '}
-          <button
-            onClick={() => { setMode((m) => (m === 'login' ? 'register' : 'login')); setError(''); }}
-            className="font-semibold transition-colors" style={{ color: 'var(--accent)' }}
-          >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
-          </button>
-        </p>
+        {allowRegistration && (
+          <p className="text-center text-sm mt-4" style={{ color: 'var(--text-3)' }}>
+            {mode === 'login' ? "Don't have an account?" : 'Already registered?'}{' '}
+            <button
+              onClick={() => { setMode((m) => (m === 'login' ? 'register' : 'login')); setError(''); }}
+              className="font-semibold transition-colors" style={{ color: 'var(--accent)' }}
+            >
+              {mode === 'login' ? 'Sign up' : 'Sign in'}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

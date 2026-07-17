@@ -14,6 +14,14 @@ interface Env {
   ADMIN_EMAIL: string; // the single account allowed into the admin area ('' = none)
   ADMIN_PASSWORD: string; // used only to seed the admin account on first boot
   ENCRYPTION_KEY: string; // optional; falls back to a key derived from JWT_SECRET
+  ALLOW_REGISTRATION: boolean; // when false, self-service sign-up is disabled
+}
+
+// Parse a boolean-ish environment variable. Accepts 1/true/yes/on (any case).
+function optionalBool(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === '') return fallback;
+  return /^(1|true|yes|on)$/i.test(value.trim());
 }
 
 function required(name: string): string {
@@ -55,6 +63,7 @@ export function loadEnv(): Env {
     ADMIN_EMAIL: optional('ADMIN_EMAIL', '').trim().toLowerCase(),
     ADMIN_PASSWORD: optional('ADMIN_PASSWORD', ''),
     ENCRYPTION_KEY: optional('ENCRYPTION_KEY', ''),
+    ALLOW_REGISTRATION: optionalBool('ALLOW_REGISTRATION', true),
   };
 
   return cached;

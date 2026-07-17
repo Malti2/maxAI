@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
 import { toPublicUser } from '../lib/serialize';
@@ -26,7 +26,7 @@ function generateTokens(userId: string) {
   const accessToken = jwt.sign({ userId }, env.JWT_SECRET, {
     expiresIn: env.ACCESS_TOKEN_TTL,
   } as jwt.SignOptions);
-  const refreshToken = uuidv4();
+  const refreshToken = randomUUID();
   return { accessToken, refreshToken };
 }
 
@@ -34,9 +34,22 @@ function refreshExpiry(): Date {
   return new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 }
 
+// Public, unauthenticated hints the login screen needs before anyone signs in.
+router.get('/config', (_req: Request, res: Response) => {
+  res.json({ allowRegistration: env.ALLOW_REGISTRATION });
+});
+
 router.post(
   '/register',
   asyncHandler(async (req: Request, res: Response) => {
+    // Self-service sign-up can be turned off for locked-down deployments so a
+    // publicly reachable instance can't be used by strangers on the operator's
+    // API budget. The designated admin account is still seeded on boot.
+    if (!env.ALLOW_REGISTRATION) {
+      res.status(403).json({ error: 'Registration is disabled' });
+      return;
+    }
+
     const data = RegisterSchema.parse(req.body);
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });

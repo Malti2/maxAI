@@ -35,6 +35,8 @@ services:
       PORT: 3001
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
       REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      # Set to false to disable self-service sign-up on a locked-down instance.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # AI provider (any Chat-Completions-compatible endpoint)
