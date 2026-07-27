@@ -12,6 +12,13 @@ export interface User {
   soundEnabled: boolean;
   avatarColor: string;
   systemPrompt: string | null;
+  webSearch: boolean;
+  webSearchSources: number;
+  webSearchReadPages: boolean;
+  temperature: number | null;
+  maxTokens: number | null;
+  historyLimit: number;
+  reasoningEffort: string | null;
   isAdmin: boolean;
 }
 

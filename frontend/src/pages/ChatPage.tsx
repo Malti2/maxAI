@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PanelLeft, ChevronDown, SquarePen } from 'lucide-react';
+import { PanelLeft, ChevronDown, SquarePen, Download } from 'lucide-react';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
 import { Home } from '../components/chat/Home';
@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import { useChat } from '../hooks/useChat';
 import { toast } from '../store/toastStore';
 import { playTapback } from '../lib/sounds';
+import { conversationToMarkdown, downloadMarkdown, slugify } from '../lib/exportChat';
 import api from '../lib/api';
 import { ModelBadge } from '../components/ui/ModelBadge';
 import type { ModelId } from '../lib/models';
@@ -45,7 +46,7 @@ export const ChatPage: React.FC = () => {
   const navigate = useNavigate();
   const {
     messages, setMessages, activeConversationId, setActiveConversation,
-    conversations, sidebarOpen, setSidebarOpen, isStreaming,
+    conversations, sidebarOpen, setSidebarOpen, isStreaming, searchState,
     enqueuePending, addMessage, setMessageReaction,
   } = useChatStore();
   const { user } = useAuthStore();
@@ -60,19 +61,29 @@ export const ChatPage: React.FC = () => {
   const chatModeEnabled = user?.chatMode ?? false;
 
   useEffect(() => {
-    if (id && id !== activeConversationId) {
-      setLoading(true);
-      setActiveConversation(id);
-      api.get(`/chat/conversations/${id}`)
-        .then(({ data }) => setMessages(data.messages || []))
-        .catch(() => toast.error('Could not load this conversation.'))
-        .finally(() => setLoading(false));
-    } else if (!id) {
+    setReplyingTo(null);
+
+    if (!id) {
       setActiveConversation(null);
       setMessages([]);
+      return;
     }
-    setReplyingTo(null);
-  }, [id, activeConversationId, setActiveConversation, setMessages]);
+
+    // The store already holds this conversation's messages — either because we
+    // just created it in this tab (optimistic + streaming messages) or because
+    // it was loaded before. Re-fetching here would throw those away.
+    if (useChatStore.getState().messagesConversationId === id) {
+      setActiveConversation(id);
+      return;
+    }
+
+    setLoading(true);
+    setActiveConversation(id);
+    api.get(`/chat/conversations/${id}`)
+      .then(({ data }) => setMessages(data.messages || [], id))
+      .catch(() => toast.error('Could not load this conversation.'))
+      .finally(() => setLoading(false));
+  }, [id, setActiveConversation, setMessages]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -145,6 +156,34 @@ export const ChatPage: React.FC = () => {
     navigate('/chat');
   };
 
+  const exportChat = useCallback(() => {
+    const current = useChatStore.getState().messages;
+    if (current.length === 0) return;
+    const title = activeConv?.title || 'maxAI chat';
+    downloadMarkdown(`${slugify(title)}.md`, conversationToMarkdown(title, current));
+    toast.success('Conversation exported as Markdown.');
+  }, [activeConv?.title]);
+
+  // Esc stops a running answer, ⌘E / Ctrl+E exports the conversation.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && useChatStore.getState().isStreaming) {
+        stopStreaming();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        exportChat();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [exportChat, stopStreaming]);
+
+  const thinkingLabel =
+    searchState === 'searching' ? 'Searching the web…' :
+    searchState === 'reading' ? 'Reading sources…' : null;
+
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Slim top bar */}
@@ -175,17 +214,30 @@ export const ChatPage: React.FC = () => {
         </div>
 
         {!isHome && (
-          <button
-            onClick={newChat}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-2)' }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
-            aria-label="New chat"
-            title="New chat (⌘K)"
-          >
-            <SquarePen size={17} />
-          </button>
+          <>
+            <button
+              onClick={exportChat}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--text-2)' }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+              aria-label="Export conversation as Markdown"
+              title="Export as Markdown (⌘E)"
+            >
+              <Download size={17} />
+            </button>
+            <button
+              onClick={newChat}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--text-2)' }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-3)')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+              aria-label="New chat"
+              title="New chat (⌘K)"
+            >
+              <SquarePen size={17} />
+            </button>
+          </>
         )}
       </div>
 
@@ -229,6 +281,7 @@ export const ChatPage: React.FC = () => {
                     {showSeparator && <DateSeparator label={formatSeparator(new Date(m.createdAt))} />}
                     <MessageBubble
                       message={m}
+                      thinkingLabel={m.streaming ? thinkingLabel : null}
                       chatModeEnabled={chatModeEnabled}
                       replyTarget={m.replyToId ? messageById.get(m.replyToId) ?? null : null}
                       firstInGroup={firstInGroup}

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { getResolvedProvider, type ResolvedModelId, type ResolvedProviderModel } from './config';
+import { DEFAULT_MAX_TOKENS, type GenerationSettings } from './generation';
 
 export type ModelId = 'lite' | 'pro' | 'beast' | 'auto';
 export type { ResolvedModelId } from './config';
@@ -48,13 +49,18 @@ export interface StreamResult {
   tokens?: number;
 }
 
-export async function streamChat(
-  modelId: ModelId,
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
-  systemPrompt?: string,
-  onChunk?: (chunk: string) => void,
-  signal?: AbortSignal
-): Promise<StreamResult> {
+export interface StreamChatParams {
+  modelId: ModelId;
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  systemPrompt?: string;
+  /** Per-user generation settings; anything unset falls back to the tier default. */
+  settings?: GenerationSettings;
+  onChunk?: (chunk: string) => void;
+  signal?: AbortSignal;
+}
+
+export async function streamChat(params: StreamChatParams): Promise<StreamResult> {
+  const { modelId, messages, systemPrompt, settings, onChunk, signal } = params;
   const resolvedModel = resolveModel(modelId, messages);
   const provider = await getResolvedProvider();
   const mc = provider.models[resolvedModel];
@@ -72,9 +78,12 @@ export async function streamChat(
       model: mc.model,
       messages: messageList,
       stream: true,
-      temperature: TEMPERATURE[resolvedModel],
-      max_tokens: 4096,
+      temperature: settings?.temperature ?? TEMPERATURE[resolvedModel],
+      max_tokens: settings?.maxTokens ?? DEFAULT_MAX_TOKENS,
       stream_options: { include_usage: true },
+      // Only sent when the user opted in — providers without reasoning support
+      // reject unknown parameters.
+      ...(settings?.reasoningEffort ? { reasoning_effort: settings.reasoningEffort } : {}),
     },
     { signal }
   );

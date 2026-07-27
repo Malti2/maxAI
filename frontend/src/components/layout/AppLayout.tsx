@@ -11,7 +11,7 @@ import api from '../../lib/api';
 export const AppLayout: React.FC = () => {
   const {
     setConversations, setActiveConversation, setMessages, setSelectedModel,
-    setSidebarOpen,
+    setSidebarOpen, setWebSearch, setWebSearchAvailable,
   } = useChatStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -23,9 +23,21 @@ export const AppLayout: React.FC = () => {
       .catch(() => toast.error('Could not load your conversations.'));
   }, [setConversations]);
 
+  // Features the operator has switched off should not show up as toggles.
+  useEffect(() => {
+    api.get('/settings/capabilities')
+      .then(({ data }) => setWebSearchAvailable(!!data.webSearch))
+      .catch(() => { /* keep the default and let the request fail loudly instead */ });
+  }, [setWebSearchAvailable]);
+
   useEffect(() => {
     if (user?.defaultModel) setSelectedModel(user.defaultModel as ModelId);
   }, [user?.defaultModel, setSelectedModel]);
+
+  // The stored web-search preference seeds the composer toggle.
+  useEffect(() => {
+    setWebSearch(!!user?.webSearch);
+  }, [user?.webSearch, setWebSearch]);
 
   const handleNewChat = React.useCallback(() => {
     setActiveConversation(null);
@@ -45,11 +57,14 @@ export const AppLayout: React.FC = () => {
       } else if (meta && e.key === '/') {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
+      } else if (meta && e.key === ',') {
+        e.preventDefault();
+        navigate('/settings');
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [handleNewChat, setSidebarOpen]);
+  }, [handleNewChat, setSidebarOpen, navigate]);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>

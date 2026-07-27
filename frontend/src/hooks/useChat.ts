@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore, type Message } from '../store/chatStore';
+import { useChatStore, type Message, type WebSource } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import { toast } from '../store/toastStore';
 import { playSend, playReceive } from '../lib/sounds';
@@ -30,8 +30,11 @@ export function useChat() {
     addMessage,
     addConversation,
     setActiveConversation,
+    setMessages,
     updateConversation,
     clearPendingQueue,
+    setSearchState,
+    addSessionTokens,
   } = useChatStore();
   const { accessToken } = useAuthStore();
   const navigate = useNavigate();
@@ -69,6 +72,7 @@ export function useChat() {
         let realUserMsg: Message | null = null;
         let realPendingMsgs: Message[] = [];
         let aiReaction: { messageId: string; reaction: string } | null = null;
+        let sources: WebSource[] | null = null;
         let accumulated = '';
 
         while (true) {
@@ -98,9 +102,21 @@ export function useChat() {
               case 'reaction':
                 aiReaction = { messageId: event.messageId as string, reaction: event.reaction as string };
                 break;
+              case 'search':
+                // 'searching' | 'reading' while gathering web results, 'empty' when
+                // the search came back with nothing.
+                setSearchState(event.state === 'reading' ? 'reading' : event.state === 'searching' ? 'searching' : 'idle');
+                break;
+              case 'sources': {
+                sources = event.sources as WebSource[];
+                setSearchState('idle');
+                useChatStore.getState().patchMessage(assistantTempId, { sources });
+                break;
+              }
               case 'delta': {
                 if (!receivedFirstDelta) {
                   receivedFirstDelta = true;
+                  setSearchState('idle');
                   playReceive();
                 }
                 accumulated += event.content as string;
@@ -109,8 +125,10 @@ export function useChat() {
               }
               case 'done': {
                 const store = useChatStore.getState();
-                const realAssistant = event.message
-                  ? [{ ...(event.message as Message), streaming: false }]
+                const persisted = event.message as (Message & { tokens?: number }) | undefined;
+                if (persisted?.tokens) addSessionTokens(persisted.tokens);
+                const realAssistant = persisted
+                  ? [{ ...persisted, sources: persisted.sources ?? sources, streaming: false }]
                   : [];
                 const appended = [
                   ...(realUserMsg ? [realUserMsg] : []),
@@ -162,10 +180,11 @@ export function useChat() {
         // Ensure the placeholder is no longer marked as streaming.
         useChatStore.getState().patchMessage(assistantTempId, { streaming: false });
         abortRef.current = null;
+        setSearchState('idle');
         setStreaming(false);
       }
     },
-    [accessToken, setStreaming, updateConversation]
+    [accessToken, setStreaming, updateConversation, setSearchState, addSessionTokens]
   );
 
   // ── Send a new message ────────────────────────────────────────────
@@ -179,6 +198,10 @@ export function useChat() {
         const { data } = await api.post('/chat/conversations', { model: selectedModel });
         addConversation(data);
         setActiveConversation(data.id);
+        // Claim the (still empty) message list for the new conversation before
+        // navigating, so the chat page knows it must not re-load it from the API
+        // and wipe the optimistic + streaming messages we are about to add.
+        setMessages([], data.id);
         convId = data.id;
         isNew = true;
         navigate(`/chat/${data.id}`, { replace: true });
@@ -216,6 +239,7 @@ export function useChat() {
         body: {
           content,
           model: selectedModel,
+          webSearch: useChatStore.getState().webSearch,
           ...(options.replyToId ? { replyToId: options.replyToId } : {}),
           ...(queueSnapshot.length > 0 ? { pendingMessages: queueSnapshot } : {}),
         },
@@ -225,7 +249,7 @@ export function useChat() {
         titleSeed: isFirst ? content : null,
       });
     },
-    [activeConversationId, selectedModel, navigate, addConversation, setActiveConversation, addMessage, clearPendingQueue, runStream]
+    [activeConversationId, selectedModel, navigate, addConversation, setActiveConversation, setMessages, addMessage, clearPendingQueue, runStream]
   );
 
   // ── Regenerate the last assistant reply ────────────────────────────
@@ -250,7 +274,7 @@ export function useChat() {
     await runStream({
       url: `/api/chat/conversations/${convId}/regenerate`,
       method: 'POST',
-      body: { model: selectedModel },
+      body: { model: selectedModel, webSearch: store.webSearch },
       convId,
       tempIds: [tempAssistantId],
       assistantTempId: tempAssistantId,
@@ -281,7 +305,7 @@ export function useChat() {
       await runStream({
         url: `/api/chat/conversations/${convId}/messages/${messageId}`,
         method: 'PUT',
-        body: { content, model: selectedModel },
+        body: { content, model: selectedModel, webSearch: store.webSearch },
         convId,
         tempIds: [tempAssistantId],
         assistantTempId: tempAssistantId,

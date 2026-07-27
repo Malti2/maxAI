@@ -1,6 +1,6 @@
 # Personalities
 
-Max can respond in one of three personalities. A personality sets Max's
+Max can respond in one of six personalities. A personality sets Max's
 identity, tone and formatting; an optional custom system instruction is layered
 on top of it. The choice is stored per user (`User.personality`, default
 `assistant`) and applied server-side.
@@ -10,6 +10,9 @@ on top of it. The choice is stored per user (`User.personality`, default
 | **Casual** | relaxed & direct | Like a text from a clever friend — lowercase, short, no fluff, no emojis |
 | **Assistant** | balanced (default) | Friendly and clear with clean Markdown formatting |
 | **Professional** | formal & precise | Objective, structured and business-ready |
+| **Precise** | short & factual | Answer first, no filler; assumptions and gaps stated openly |
+| **Tutor** | step by step | Builds up an explanation, defines terms, ends with an example |
+| **Creative** | vivid & playful | Images, comparisons and a voice of its own — still accurate |
 
 ## How it works
 

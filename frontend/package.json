@@ -16,6 +16,7 @@
     "date-fns": "^4.4.0",
     "framer-motion": "^12.42.2",
     "highlight.js": "^11.11.1",
+    "katex": "^0.16.47",
     "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -23,7 +24,9 @@
     "react-router-dom": "^7.18.1",
     "react-textarea-autosize": "^8.5.9",
     "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "tailwindcss": "^4.3.2",
     "zustand": "^5.0.14"
   },

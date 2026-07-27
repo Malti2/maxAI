@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import hljs from 'highlight.js/lib/common';
 import TextareaAutosize from 'react-textarea-autosize';
-import { Copy, Check, Reply, SmilePlus, RefreshCw, Pencil } from 'lucide-react';
-import type { Message } from '../../store/chatStore';
+import { Copy, Check, Reply, SmilePlus, RefreshCw, Pencil, ExternalLink } from 'lucide-react';
+import type { Message, WebSource } from '../../store/chatStore';
 import type { ModelId } from '../../lib/models';
 import type { ReactionType } from '../../lib/reactions';
 import { ModelBadge } from '../ui/ModelBadge';
@@ -65,6 +67,51 @@ const markdownComponents = {
   },
 };
 
+/* ── Web-search citations ── */
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
+// The backend already rejects anything but public http(s) URLs; re-checking here
+// means a stored source can never turn into a `javascript:` link.
+const isHttpUrl = (url: string): boolean => /^https?:\/\//i.test(url);
+
+const Sources: React.FC<{ sources: WebSource[] }> = ({ sources }) => {
+  const safe = sources.filter((s) => isHttpUrl(s.url));
+  if (safe.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+      {safe.map((source, i) => (
+        <a
+          key={`${source.url}-${i}`}
+          href={source.url}
+          target="_blank"
+          rel="noreferrer noopener nofollow"
+          title={source.snippet ? `${source.title} — ${source.snippet}` : source.title}
+          className="flex items-center gap-1.5 max-w-[260px] pl-1.5 pr-2.5 py-1 rounded-full text-[11.5px] transition-colors"
+          style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-2)' }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border)')}
+        >
+          <span
+            className="w-4 h-4 rounded-full flex items-center justify-center text-[9.5px] font-semibold shrink-0"
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+          >
+            {i + 1}
+          </span>
+          <span className="truncate">{source.title || hostOf(source.url)}</span>
+          <ExternalLink size={10} className="shrink-0" style={{ color: 'var(--text-3)' }} />
+        </a>
+      ))}
+    </div>
+  );
+};
+
 /* ── Quoted preview of the message being replied to ── */
 const ReplyPreview: React.FC<{ target: Message; align: 'left' | 'right' }> = ({ target, align }) => {
   const author = target.role === 'assistant' ? 'Max' : 'You';
@@ -100,6 +147,8 @@ const ActionButton: React.FC<{ title: string; onClick?: () => void; children: Re
 
 interface MessageBubbleProps {
   message: Message;
+  /** Label for the placeholder while a turn is being prepared (e.g. web search). */
+  thinkingLabel?: string | null;
   chatModeEnabled?: boolean;
   replyTarget?: Message | null;
   firstInGroup?: boolean;
@@ -113,6 +162,7 @@ interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
+  thinkingLabel = null,
   chatModeEnabled = false,
   replyTarget = null,
   firstInGroup = true,
@@ -252,10 +302,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div className="flex-1 min-w-0 group">
           <div className="relative inline-block max-w-full">
             {isThinking ? (
-              <div className="typing-dots pt-1"><span /><span /><span /></div>
+              thinkingLabel ? (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="shimmer-text text-[13.5px]">{thinkingLabel}</span>
+                </div>
+              ) : (
+                <div className="typing-dots pt-1"><span /><span /><span /></div>
+              )
             ) : (
               <div className={`prose-max ${message.streaming ? 'typing-cursor' : ''}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents as never}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[[rehypeKatex, { output: 'html', throwOnError: false, strict: false }]]}
+                  components={markdownComponents as never}
+                >
                   {message.content}
                 </ReactMarkdown>
               </div>
@@ -264,6 +324,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <TapbackBadge reaction={message.reaction} side="right" onClick={() => canReact && setPickerOpen(true)} />
             )}
           </div>
+
+          {message.sources && message.sources.length > 0 && <Sources sources={message.sources} />}
 
           {/* Meta line + hover actions on the tail message */}
           {!isThinking && !message.streaming && message.content && (

@@ -21,6 +21,18 @@ model User {
   chatMode        Boolean   @default(false)
   soundEnabled    Boolean   @default(true)
   systemPrompt    String?
+
+  // Web search (keyless: DuckDuckGo + Wikipedia + reader)
+  webSearch          Boolean @default(false)
+  webSearchSources   Int     @default(4)
+  webSearchReadPages Boolean @default(true)
+
+  // Generation settings (null = provider/tier default)
+  temperature     Float?
+  maxTokens       Int?
+  historyLimit    Int       @default(50)
+  reasoningEffort String?
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -51,6 +63,7 @@ model Message {
   tokens         Int?      // token count
   reaction       String?   // tapback reaction (e.g. "love", "like") — Chat Mode only
   edited         Boolean   @default(false) // true once the user edits & resends
+  sources        Json?     // web-search sources cited by this answer
   createdAt      DateTime  @default(now())
 
   conversationId String

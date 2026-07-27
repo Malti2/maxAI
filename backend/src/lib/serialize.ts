@@ -21,6 +21,13 @@ export interface UserRow {
   soundEnabled: boolean;
   avatarColor: string;
   systemPrompt: string | null;
+  webSearch: boolean;
+  webSearchSources: number;
+  webSearchReadPages: boolean;
+  temperature: number | null;
+  maxTokens: number | null;
+  historyLimit: number;
+  reasoningEffort: string | null;
 }
 
 export interface PublicUser extends UserRow {
@@ -39,6 +46,13 @@ export function toPublicUser(user: UserRow): PublicUser {
     soundEnabled: user.soundEnabled,
     avatarColor: user.avatarColor,
     systemPrompt: user.systemPrompt,
+    webSearch: user.webSearch,
+    webSearchSources: user.webSearchSources,
+    webSearchReadPages: user.webSearchReadPages,
+    temperature: user.temperature,
+    maxTokens: user.maxTokens,
+    historyLimit: user.historyLimit,
+    reasoningEffort: user.reasoningEffort,
     isAdmin: isAdminEmail(user.email),
   };
 }
