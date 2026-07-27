@@ -54,6 +54,8 @@ function eq(actual: unknown, expected: unknown, msg: string) {
     id: 'u1', email: 'a@b.co', name: 'A', onboardingDone: true, defaultModel: 'auto',
     personality: 'assistant', chatMode: false, soundEnabled: true, avatarColor: '#0a84ff',
     systemPrompt: null,
+    webSearch: true, webSearchSources: 4, webSearchReadPages: true,
+    temperature: null, maxTokens: null, historyLimit: 50, reasoningEffort: null,
     // fields that must NOT leak:
     password: 'hash', createdAt: new Date(), updatedAt: new Date(),
   } as never;
@@ -61,10 +63,13 @@ function eq(actual: unknown, expected: unknown, msg: string) {
   eq('password' in pub, false, 'password is never exposed');
   eq(pub.soundEnabled, true, 'soundEnabled included');
   eq(pub.systemPrompt, null, 'systemPrompt included (even when null)');
+  eq(pub.webSearch, true, 'webSearch included');
+  eq(pub.historyLimit, 50, 'historyLimit included');
   eq(pub.isAdmin, false, 'isAdmin false when ADMIN_EMAIL unset');
   eq(Object.keys(pub).sort(), [
-    'avatarColor', 'chatMode', 'defaultModel', 'email', 'id', 'isAdmin', 'name',
-    'onboardingDone', 'personality', 'soundEnabled', 'systemPrompt',
+    'avatarColor', 'chatMode', 'defaultModel', 'email', 'historyLimit', 'id', 'isAdmin',
+    'maxTokens', 'name', 'onboardingDone', 'personality', 'reasoningEffort', 'soundEnabled',
+    'systemPrompt', 'temperature', 'webSearch', 'webSearchReadPages', 'webSearchSources',
   ], 'exact public key set');
 }
 

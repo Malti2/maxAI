@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Palette, Brain, Trash2, LogOut, Check,
-  Moon, Sun, Monitor, MessageCircle, Volume2, ShieldCheck,
+  Moon, Sun, Monitor, MessageCircle, Volume2, ShieldCheck, Globe, SlidersHorizontal,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { AdminPanel } from '../components/admin/AdminPanel';
@@ -21,13 +21,14 @@ const AVATAR_COLORS = [
   '#dd8a2b', '#e0b21f', '#30a46c', '#3aa0d8',
 ];
 
-type Section = 'profile' | 'appearance' | 'models' | 'data' | 'admin';
+type Section = 'profile' | 'appearance' | 'models' | 'generation' | 'data' | 'admin';
 
 const SectionNav: React.FC<{ active: Section; onChange: (s: Section) => void; isAdmin: boolean }> = ({ active, onChange, isAdmin }) => {
   const items: { id: Section; label: string; icon: React.ReactNode }[] = [
     { id: 'profile', label: 'Profile', icon: <User size={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'models', label: 'AI & Models', icon: <Brain size={16} /> },
+    { id: 'generation', label: 'Answers & Web', icon: <SlidersHorizontal size={16} /> },
     { id: 'data', label: 'Data', icon: <Trash2 size={16} /> },
     ...(isAdmin ? [{ id: 'admin' as Section, label: 'Admin', icon: <ShieldCheck size={16} /> }] : []),
   ];
@@ -93,7 +94,7 @@ export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, updateUser, logout, refreshToken } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
-  const { setConversations } = useChatStore();
+  const { setConversations, webSearchAvailable } = useChatStore();
 
   const [section, setSection] = useState<Section>('profile');
   const [name, setName] = useState(user?.name || '');
@@ -103,6 +104,13 @@ export const SettingsPage: React.FC = () => {
   const [chatMode, setChatMode] = useState<boolean>(user?.chatMode ?? false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(user?.soundEnabled ?? true);
   const [sysPrompt, setSysPrompt] = useState<string>(user?.systemPrompt ?? '');
+  const [webSearch, setWebSearchLocal] = useState<boolean>(user?.webSearch ?? false);
+  const [webSearchSources, setWebSearchSources] = useState<number>(user?.webSearchSources ?? 4);
+  const [webSearchReadPages, setWebSearchReadPages] = useState<boolean>(user?.webSearchReadPages ?? true);
+  const [temperature, setTemperature] = useState<number | null>(user?.temperature ?? null);
+  const [maxTokens, setMaxTokens] = useState<number | null>(user?.maxTokens ?? null);
+  const [historyLimit, setHistoryLimit] = useState<number>(user?.historyLimit ?? 50);
+  const [reasoningEffort, setReasoningEffort] = useState<string>(user?.reasoningEffort ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -118,6 +126,13 @@ export const SettingsPage: React.FC = () => {
         soundEnabled,
         avatarColor: color,
         systemPrompt: sysPrompt || null,
+        webSearch,
+        webSearchSources,
+        webSearchReadPages,
+        temperature,
+        maxTokens,
+        historyLimit,
+        reasoningEffort: reasoningEffort || null,
       });
       updateUser(data);
       setSaved(true);
@@ -340,6 +355,122 @@ export const SettingsPage: React.FC = () => {
           </div>
         );
 
+      case 'generation':
+        return (
+          <div className="space-y-5">
+            <div>
+              <FieldLabel label="Web search" hint="Keyless: DuckDuckGo and Wikipedia, read through a text reader" />
+              {!webSearchAvailable ? (
+                <p className="text-xs p-3.5 rounded-2xl" style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}>
+                  Web search is switched off for this deployment (<code>WEB_SEARCH_ENABLED=false</code>).
+                </p>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setWebSearchLocal((v) => !v)}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+                    style={{ borderColor: webSearch ? 'var(--accent)' : 'var(--border)', background: webSearch ? 'var(--accent-soft)' : 'var(--bg)' }}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: webSearch ? 'var(--accent-soft)' : 'var(--bg-3)', color: webSearch ? 'var(--accent)' : 'var(--text-3)' }}>
+                      <Globe size={17} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Search the web by default</span>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                        Max looks things up before answering and cites its sources. The globe in the composer toggles it per chat.
+                      </p>
+                    </div>
+                    <Toggle on={webSearch} />
+                  </button>
+
+                  <div className="mt-4">
+                    <FieldLabel label={`Sources per search — ${webSearchSources}`} hint="More sources mean better coverage and a slower answer" />
+                    <input
+                      type="range" min={1} max={8} step={1} value={webSearchSources}
+                      onChange={(e) => setWebSearchSources(Number(e.target.value))}
+                      className="w-full" style={{ accentColor: 'var(--accent)' }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => setWebSearchReadPages((v) => !v)}
+                    className="w-full flex items-center gap-3 p-3.5 mt-3 rounded-2xl border-2 transition-all text-left"
+                    style={{ borderColor: webSearchReadPages ? 'var(--accent)' : 'var(--border)', background: webSearchReadPages ? 'var(--accent-soft)' : 'var(--bg)' }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Read the pages</span>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                        Off: titles and snippets only — faster, but shallower.
+                      </p>
+                    </div>
+                    <Toggle on={webSearchReadPages} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel
+                label={`Temperature — ${temperature === null ? 'model default' : temperature.toFixed(1)}`}
+                hint="Low is focused and repeatable, high is more varied"
+              />
+              <div className="flex items-center gap-3">
+                <input
+                  type="range" min={0} max={2} step={0.1}
+                  value={temperature ?? 0.7}
+                  onChange={(e) => setTemperature(Number(e.target.value))}
+                  className="flex-1" style={{ accentColor: 'var(--accent)' }}
+                />
+                <button
+                  onClick={() => setTemperature(null)}
+                  disabled={temperature === null}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium disabled:opacity-40 shrink-0"
+                  style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel label="Max tokens per answer" hint="Empty = the model's default (4096)" />
+              <input
+                type="number" min={256} max={32000} step={256}
+                value={maxTokens ?? ''}
+                onChange={(e) => setMaxTokens(e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="4096"
+                className={inputClass} style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <FieldLabel label="History limit" hint="How many earlier messages travel with each request" />
+              <input
+                type="number" min={2} max={200} step={2}
+                value={historyLimit}
+                onChange={(e) => setHistoryLimit(Number(e.target.value))}
+                className={inputClass} style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <FieldLabel label="Reasoning effort" hint="Only send this if your provider's model supports it" />
+              <select
+                value={reasoningEffort}
+                onChange={(e) => setReasoningEffort(e.target.value)}
+                className={inputClass} style={inputStyle}
+              >
+                <option value="">Model default</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+
+            <SaveButton onClick={save} loading={saving} saved={saved} />
+          </div>
+        );
+
       case 'data':
         return (
           <div className="space-y-3">            <div className="p-4 rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
@@ -406,7 +537,11 @@ export const SettingsPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6">
           <div className={section === 'admin' ? 'max-w-xl' : 'max-w-md'}>
             <h2 className="text-lg font-bold mb-5 tracking-tight" style={{ color: 'var(--text-1)' }}>
-              {section === 'profile' ? 'Profile' : section === 'appearance' ? 'Appearance' : section === 'models' ? 'AI & Models' : section === 'admin' ? 'Admin' : 'Data & Privacy'}
+              {section === 'profile' ? 'Profile'
+                : section === 'appearance' ? 'Appearance'
+                : section === 'models' ? 'AI & Models'
+                : section === 'generation' ? 'Answers & Web'
+                : section === 'admin' ? 'Admin' : 'Data & Privacy'}
             </h2>
             {renderSection()}
           </div>

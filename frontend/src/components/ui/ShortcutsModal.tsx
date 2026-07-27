@@ -9,10 +9,12 @@ interface ShortcutsModalProps {
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['⌘', 'K'], label: 'New chat' },
   { keys: ['⌘', 'B'], label: 'Toggle sidebar' },
+  { keys: ['⌘', ','], label: 'Open settings' },
+  { keys: ['⌘', 'E'], label: 'Export chat as Markdown' },
   { keys: ['⌘', '/'], label: 'Show keyboard shortcuts' },
   { keys: ['↵'], label: 'Send message' },
   { keys: ['⇧', '↵'], label: 'New line' },
-  { keys: ['Esc'], label: 'Cancel reply / close' },
+  { keys: ['Esc'], label: 'Stop answer / cancel reply' },
 ];
 
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ open, onClose }) => {

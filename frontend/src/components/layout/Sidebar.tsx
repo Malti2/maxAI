@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   const {
     conversations, activeConversationId, setActiveConversation,
     removeConversation, updateConversation, sidebarOpen, setSidebarOpen,
+    sessionTokens,
   } = useChatStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -274,6 +275,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
       </div>
 
       <div className="p-2" style={{ borderTop: '1px solid var(--border)' }}>
+        {sessionTokens > 0 && (
+          <p
+            className="px-2.5 pb-1.5 text-[11px]"
+            style={{ color: 'var(--text-3)' }}
+            title="Tokens Max used in this browser session"
+          >
+            {sessionTokens.toLocaleString()} tokens this session
+          </p>
+        )}
         <button
           onClick={() => navigate('/settings')}
           className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-colors text-left"

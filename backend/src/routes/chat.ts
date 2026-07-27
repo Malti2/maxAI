@@ -14,12 +14,16 @@ import {
 } from '../services/chatMode';
 import { streamAssistantTurn } from '../services/chatStream';
 import { REACTION_TYPES } from '../services/reactions';
+import { resolveGenerationSettings, LIMITS, type GenerationSettings } from '../services/generation';
+import { webSearch, buildWebSearchPrompt, isWebSearchEnabled, type WebSource } from '../services/websearch';
 
 const router = Router();
 
 const MODEL_ENUM = z.enum(['lite', 'pro', 'beast', 'auto']);
 const MAX_MESSAGE_LEN = 32000;
-const HISTORY_LIMIT = 50;
+// Upper bound for the rows we load; the user's own history limit is applied on
+// top of this (see resolveGenerationSettings).
+const MAX_HISTORY_ROWS = LIMITS.historyLimit.max;
 
 // ── Conversations ────────────────────────────────────────────────
 
@@ -220,6 +224,43 @@ async function touchConversation(id: string): Promise<void> {
   await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
 }
 
+// ── Web search ───────────────────────────────────────────────────
+
+// Run a keyless web search for `query` and report progress over the already-open
+// SSE stream. Never throws: a failed search just means no web context.
+interface WebSearchTurn {
+  sources: WebSource[];
+  prompt: string;
+}
+
+async function gatherWebContext(
+  res: Response,
+  query: string,
+  user: { webSearchSources?: number | null; webSearchReadPages?: boolean | null } | null,
+  signal: AbortSignal
+): Promise<WebSearchTurn | null> {
+  if (!isWebSearchEnabled()) return null;
+
+  try {
+    const result = await webSearch(query, {
+      maxSources: user?.webSearchSources ?? 4,
+      readPages: user?.webSearchReadPages ?? true,
+      onPhase: (phase) => sse(res, { type: 'search', state: phase }),
+      signal,
+    });
+    if (!result) {
+      sse(res, { type: 'search', state: 'empty' });
+      return null;
+    }
+    sse(res, { type: 'sources', sources: result.sources.map((s) => ({ title: s.title, url: s.url, snippet: s.snippet })) });
+    return { sources: result.sources, prompt: buildWebSearchPrompt(result.context) };
+  } catch (err) {
+    console.error('Web search failed:', err);
+    sse(res, { type: 'search', state: 'empty' });
+    return null;
+  }
+}
+
 // Run one assistant turn over the already-open SSE stream and always finish the
 // response cleanly — emitting a `done` event on success or an `error` event if
 // the model call fails after streaming has begun.
@@ -230,6 +271,8 @@ interface FinishTurnOptions {
   requestedModel: ModelId;
   chatMode: boolean;
   reactionTargetId: string | null;
+  settings: GenerationSettings;
+  sources?: WebSource[];
   signal: AbortSignal;
   titleSeed?: string; // when set (first message), name the conversation from it
 }
@@ -244,6 +287,8 @@ async function finishTurn(res: Response, opts: FinishTurnOptions): Promise<void>
       requestedModel: opts.requestedModel,
       chatMode: opts.chatMode,
       reactionTargetId: opts.reactionTargetId,
+      settings: opts.settings,
+      sources: opts.sources,
       signal: opts.signal,
     });
 
@@ -273,20 +318,24 @@ const SendMessageSchema = z.object({
   model: MODEL_ENUM.optional(),
   pendingMessages: z.array(z.string().min(1).max(MAX_MESSAGE_LEN)).max(20).optional(),
   replyToId: z.string().optional().nullable(),
+  // Per-message override of the user's web-search preference (the globe in the
+  // composer). Omitted = use the stored preference.
+  webSearch: z.boolean().optional(),
 });
 
 router.post(
   '/conversations/:id/messages',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { content, model, pendingMessages, replyToId } = SendMessageSchema.parse(req.body);
+    const { content, model, pendingMessages, replyToId, webSearch: webSearchOverride } =
+      SendMessageSchema.parse(req.body);
 
     const conv = await prisma.conversation.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      // Take the *most recent* HISTORY_LIMIT messages (desc), then restore
-      // chronological order below. Ordering asc with `take` would keep the
-      // oldest messages instead and drop recent context on long conversations.
-      include: { messages: { orderBy: { createdAt: 'desc' }, take: HISTORY_LIMIT } },
+      // Take the *most recent* messages (desc), then restore chronological order
+      // below. Ordering asc with `take` would keep the oldest messages instead
+      // and drop recent context on long conversations.
+      include: { messages: { orderBy: { createdAt: 'desc' }, take: MAX_HISTORY_ROWS } },
     });
     if (!conv) {
       res.status(404).json({ error: 'Not found' });
@@ -295,9 +344,12 @@ router.post(
 
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const chatMode = user?.chatMode ?? false;
+    const settings = resolveGenerationSettings(user);
+    const useWebSearch = webSearchOverride ?? user?.webSearch ?? false;
     const requestedModel = (model || conv.model || 'auto') as ModelId;
-    const storedMsgs = [...(conv.messages as StoredMessage[])].reverse();
-    const isFirstMessage = storedMsgs.length === 0;
+    const allStoredMsgs = [...(conv.messages as StoredMessage[])].reverse();
+    const storedMsgs = allStoredMsgs.slice(-settings.historyLimit);
+    const isFirstMessage = allStoredMsgs.length === 0;
 
     // Reply targeting is a Chat Mode feature; the target must be an existing
     // message in this conversation.
@@ -354,6 +406,11 @@ router.post(
       sse(res, { type: 'pending_messages', messages: savedPendingMsgs });
     }
 
+    const web = useWebSearch
+      ? await gatherWebContext(res, lastUserMsg.content, user, controller.signal)
+      : null;
+    if (web) systemPrompt = `${systemPrompt}\n\n${web.prompt}`;
+
     await finishTurn(res, {
       conversationId: conv.id,
       history,
@@ -361,6 +418,8 @@ router.post(
       requestedModel,
       chatMode,
       reactionTargetId: lastUserMsg.id,
+      settings,
+      sources: web?.sources,
       signal: controller.signal,
       titleSeed: isFirstMessage ? content : undefined,
     });
@@ -370,7 +429,7 @@ router.post(
 // ── Regenerate the assistant's reply to the latest user turn ──────
 
 const RegenerateSchema = z
-  .object({ model: MODEL_ENUM.optional() })
+  .object({ model: MODEL_ENUM.optional(), webSearch: z.boolean().optional() })
   .strict()
   .optional();
 
@@ -403,18 +462,25 @@ router.post(
       await prisma.message.deleteMany({ where: { id: { in: toDelete } } });
     }
 
-    const kept = msgs.slice(0, lastUserIdx + 1);
-    const history = buildModelHistory(kept.slice(-HISTORY_LIMIT));
-    const lastUserMsg = kept[lastUserIdx];
-
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const chatMode = user?.chatMode ?? false;
+    const settings = resolveGenerationSettings(user);
+    const useWebSearch = body.webSearch ?? user?.webSearch ?? false;
     const requestedModel = (body.model || conv.model || 'auto') as ModelId;
+
+    const kept = msgs.slice(0, lastUserIdx + 1);
+    const history = buildModelHistory(kept.slice(-settings.historyLimit));
+    const lastUserMsg = kept[lastUserIdx];
 
     let systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
     if (chatMode) systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
 
     const controller = openSSE(req, res);
+
+    const web = useWebSearch
+      ? await gatherWebContext(res, lastUserMsg.content, user, controller.signal)
+      : null;
+    if (web) systemPrompt = `${systemPrompt}\n\n${web.prompt}`;
 
     await finishTurn(res, {
       conversationId: conv.id,
@@ -423,6 +489,8 @@ router.post(
       requestedModel,
       chatMode,
       reactionTargetId: lastUserMsg.id,
+      settings,
+      sources: web?.sources,
       signal: controller.signal,
     });
   })
@@ -433,13 +501,14 @@ router.post(
 const EditMessageSchema = z.object({
   content: z.string().min(1).max(MAX_MESSAGE_LEN),
   model: MODEL_ENUM.optional(),
+  webSearch: z.boolean().optional(),
 });
 
 router.put(
   '/conversations/:id/messages/:messageId',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { content, model } = EditMessageSchema.parse(req.body);
+    const { content, model, webSearch: webSearchOverride } = EditMessageSchema.parse(req.body);
 
     const conv = await prisma.conversation.findFirst({
       where: { id: req.params.id, userId: req.userId },
@@ -469,18 +538,23 @@ router.put(
       data: { content, edited: true },
     });
 
-    const kept = [...msgs.slice(0, idx), editedMsg as unknown as StoredMessage];
-    const history = buildModelHistory(kept.slice(-HISTORY_LIMIT));
-
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const chatMode = user?.chatMode ?? false;
+    const settings = resolveGenerationSettings(user);
+    const useWebSearch = webSearchOverride ?? user?.webSearch ?? false;
     const requestedModel = (model || conv.model || 'auto') as ModelId;
+
+    const kept = [...msgs.slice(0, idx), editedMsg as unknown as StoredMessage];
+    const history = buildModelHistory(kept.slice(-settings.historyLimit));
 
     let systemPrompt = buildSystemPrompt(user?.personality, user?.systemPrompt);
     if (chatMode) systemPrompt = `${systemPrompt}\n\n${chatModeInstructions()}`;
 
     const controller = openSSE(req, res);
     sse(res, { type: 'user_message', message: editedMsg });
+
+    const web = useWebSearch ? await gatherWebContext(res, content, user, controller.signal) : null;
+    if (web) systemPrompt = `${systemPrompt}\n\n${web.prompt}`;
 
     await finishTurn(res, {
       conversationId: conv.id,
@@ -489,6 +563,8 @@ router.put(
       requestedModel,
       chatMode,
       reactionTargetId: editedMsg.id,
+      settings,
+      sources: web?.sources,
       signal: controller.signal,
     });
   })

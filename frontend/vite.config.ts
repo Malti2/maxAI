@@ -16,6 +16,9 @@ export default defineConfig({
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return;
           if (id.includes('highlight.js')) return 'highlight';
+          // Math typesetting is bulky and rarely changes — keep it cacheable on
+          // its own (checked before the markdown group, which matches 'rehype').
+          if (id.includes('katex')) return 'katex';
           if (
             id.includes('react-markdown') || id.includes('remark') || id.includes('rehype') ||
             id.includes('micromark') || id.includes('mdast') || id.includes('hast') ||

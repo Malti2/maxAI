@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Math typesetting for assistant messages. Bundled locally — no CDN, no
+   external font requests at runtime. */
+@import "katex/dist/katex.min.css";
 
 @theme {
   --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -347,6 +350,40 @@ button, a, input, textarea, select {
   background: linear-gradient(90deg, var(--bg-2) 0%, var(--bg-3) 50%, var(--bg-2) 100%);
   background-size: 200% 100%; animation: shimmer 1.5s infinite;
 }
+
+/* Status line while a turn is being prepared ("Searching the web…"). */
+.shimmer-text {
+  background: linear-gradient(90deg, var(--text-3) 0%, var(--text-1) 50%, var(--text-3) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* ── Math (KaTeX) ─────────────────────────────── */
+.prose-max .katex { font-size: 1.02em; }
+.prose-max .katex-display {
+  margin: 0.8em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}
+/* KaTeX renders its own error markup when a formula is malformed; keep it quiet
+   instead of shouting in red. */
+.prose-max .katex-error { color: var(--danger); font-family: var(--font-mono); font-size: 0.85em; }
+
+/* GFM footnotes */
+.prose-max .footnotes {
+  margin-top: 1.4em; padding-top: 0.8em;
+  border-top: 1px solid var(--border);
+  font-size: 0.88em; color: var(--text-2);
+}
+.prose-max .footnotes h2 { font-size: 0.95em; margin: 0 0 0.4em; color: var(--text-3); }
+.prose-max sup a { text-decoration: none; font-weight: 600; }
+
+/* Task lists (GFM checkboxes) */
+.prose-max li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.15em; }
+.prose-max input[type="checkbox"] { accent-color: var(--accent); margin-right: 0.5em; }
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {

@@ -9,6 +9,8 @@ import type { Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { streamChat, resolveModel, type ModelId } from './ai';
 import { AssistantStreamFilter, type ApiMessage } from './chatMode';
+import type { GenerationSettings } from './generation';
+import type { WebSource } from './websearch';
 
 export interface AssistantTurnParams {
   res: Response;
@@ -20,6 +22,10 @@ export interface AssistantTurnParams {
   // The message an AI-authored tapback / reply attaches to (the user's most
   // recent message). Null when reactions/replies don't apply.
   reactionTargetId: string | null;
+  settings?: GenerationSettings;
+  // Web-search sources backing this answer; stored with the message so the
+  // citations survive a reload.
+  sources?: WebSource[];
   signal?: AbortSignal;
 }
 
@@ -34,7 +40,10 @@ function sse(res: Response, payload: unknown): void {
 }
 
 export async function streamAssistantTurn(params: AssistantTurnParams): Promise<AssistantTurnResult> {
-  const { res, conversationId, history, systemPrompt, requestedModel, chatMode, reactionTargetId, signal } = params;
+  const {
+    res, conversationId, history, systemPrompt, requestedModel, chatMode, reactionTargetId,
+    settings, sources, signal,
+  } = params;
 
   const resolvedModel = resolveModel(requestedModel, history);
   sse(res, { type: 'model', model: resolvedModel });
@@ -45,19 +54,20 @@ export async function streamAssistantTurn(params: AssistantTurnParams): Promise<
   let aborted = false;
 
   try {
-    const result = await streamChat(
-      resolvedModel,
-      history,
+    const result = await streamChat({
+      modelId: resolvedModel,
+      messages: history,
       systemPrompt,
-      (chunk) => {
+      settings,
+      signal,
+      onChunk: (chunk) => {
         const visible = chatMode ? filter.push(chunk) : chunk;
         if (visible) {
           visibleContent += visible;
           sse(res, { type: 'delta', content: visible });
         }
       },
-      signal
-    );
+    });
     tokens = result.tokens;
   } catch (err) {
     // A client disconnect (Stop) aborts the upstream stream. That's expected —
@@ -102,6 +112,11 @@ export async function streamAssistantTurn(params: AssistantTurnParams): Promise<
         model: resolvedModel,
         tokens,
         replyToId: chatMode && control.isReply ? reactionTargetId : null,
+        // Keep only what the UI needs for the citation chips — the page text
+        // itself is context for one turn, not something worth storing.
+        sources: sources?.length
+          ? sources.map((s) => ({ title: s.title, url: s.url, snippet: s.snippet }))
+          : undefined,
       },
     });
   }

@@ -1,8 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { ArrowUp, Square, Reply, X } from 'lucide-react';
+import { ArrowUp, Square, Reply, X, Globe, Mic } from 'lucide-react';
 import { ModelSelector } from '../ui/ModelSelector';
 import { useChatStore, type Message } from '../../store/chatStore';
+import { useAuthStore } from '../../store/authStore';
+import { isDictationSupported, startDictation, type Dictation } from '../../lib/speech';
+import { toast } from '../../store/toastStore';
 import type { ModelId } from '../../lib/models';
 import api from '../../lib/api';
 
@@ -18,13 +21,40 @@ interface ChatInputProps {
   autoFocus?: boolean;
 }
 
+const IconToggle: React.FC<{
+  title: string; active?: boolean; onClick: () => void; children: React.ReactNode;
+}> = ({ title, active = false, onClick, children }) => (
+  <button
+    onClick={onClick}
+    title={title}
+    aria-label={title}
+    aria-pressed={active}
+    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0"
+    style={{
+      background: active ? 'var(--accent-soft)' : 'transparent',
+      color: active ? 'var(--accent)' : 'var(--text-3)',
+    }}
+    onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'; }}
+    onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+  >
+    {children}
+  </button>
+);
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   value, onChange, onSend, onStop, chatModeEnabled, replyingTo, onCancelReply,
   variant = 'docked', autoFocus = true,
 }) => {
-  const { isStreaming, selectedModel, setSelectedModel } = useChatStore();
+  const {
+    isStreaming, selectedModel, setSelectedModel,
+    webSearch, setWebSearch, webSearchAvailable,
+  } = useChatStore();
+  const { updateUser } = useAuthStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dictationRef = useRef<Dictation | null>(null);
+  const [listening, setListening] = useState(false);
   const isHome = variant === 'home';
+  const dictationSupported = isDictationSupported();
 
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
@@ -33,6 +63,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   useEffect(() => {
     if (replyingTo) textareaRef.current?.focus();
   }, [replyingTo]);
+
+  // Stop a running dictation when the composer unmounts.
+  useEffect(() => () => dictationRef.current?.stop(), []);
+
+  // The globe is the same switch as the one in Settings, so persist it.
+  const toggleWebSearch = () => {
+    const next = !webSearch;
+    setWebSearch(next);
+    updateUser({ webSearch: next });
+    api.put('/settings', { webSearch: next }).catch(() => { /* the toggle still applies to this tab */ });
+  };
+
+  const toggleDictation = () => {
+    if (dictationRef.current) {
+      dictationRef.current.stop();
+      return;
+    }
+    const base = value.trim();
+    const session = startDictation({
+      onTranscript: (text) => onChange(base ? `${base} ${text}` : text),
+      onEnd: () => { dictationRef.current = null; setListening(false); },
+    });
+    if (!session) {
+      toast.error('Your browser does not support dictation.');
+      return;
+    }
+    dictationRef.current = session;
+    setListening(true);
+  };
 
   const syncModel = async (model: ModelId) => {
     const activeId = useChatStore.getState().activeConversationId;
@@ -110,7 +169,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         />
 
         <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-0.5">
-          <ModelSelector value={selectedModel} onChange={(m: ModelId) => setSelectedModel(m)} />
+          <div className="flex items-center gap-0.5 min-w-0">
+            <ModelSelector value={selectedModel} onChange={(m: ModelId) => setSelectedModel(m)} />
+            {webSearchAvailable && (
+              <IconToggle
+                title={webSearch ? 'Web search on — answers cite sources' : 'Web search off'}
+                active={webSearch}
+                onClick={toggleWebSearch}
+              >
+                <Globe size={16} />
+              </IconToggle>
+            )}
+            {dictationSupported && (
+              <IconToggle
+                title={listening ? 'Stop dictating' : 'Dictate'}
+                active={listening}
+                onClick={toggleDictation}
+              >
+                <Mic size={16} className={listening ? 'animate-pulse' : ''} />
+              </IconToggle>
+            )}
+          </div>
 
           {showStop ? (
             <button

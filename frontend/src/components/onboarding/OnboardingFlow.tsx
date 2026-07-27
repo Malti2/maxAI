@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowRight, MessageCircle } from 'lucide-react';
+import { Check, ArrowRight, MessageCircle, Globe } from 'lucide-react';
 import { MODELS } from '../../lib/models';
 import { PERSONALITIES, DEFAULT_PERSONALITY, type PersonalityId } from '../../lib/personalities';
 import { useAuthStore } from '../../store/authStore';
@@ -24,6 +24,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [selectedColor, setSelectedColor] = useState(user?.avatarColor || AVATAR_COLORS[0]);
   const [personality, setPersonality] = useState<PersonalityId>((user?.personality as PersonalityId) || DEFAULT_PERSONALITY);
   const [chatMode, setChatMode] = useState<boolean>(user?.chatMode ?? false);
+  const [webSearch, setWebSearch] = useState<boolean>(user?.webSearch ?? false);
   const [systemPrompt, setSystemPrompt] = useState(user?.systemPrompt || '');
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
@@ -35,6 +36,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     { id: 'color' },
     { id: 'model' },
     { id: 'chatmode' },
+    { id: 'websearch' },
     { id: 'system' },
     { id: 'done' },
   ] as const;
@@ -54,6 +56,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         defaultModel: selectedModel,
         personality,
         chatMode,
+        webSearch,
         avatarColor: selectedColor,
         systemPrompt: systemPrompt || null,
         onboardingDone: true,
@@ -275,6 +278,53 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         );
 
+      case 'websearch':
+        return (
+          <div className="space-y-4 w-full">
+            <p className="text-sm text-center" style={{ color: 'var(--text-2)' }}>
+              Should Max look things up online? <span style={{ color: 'var(--text-3)' }}>(Changeable anytime)</span>
+            </p>
+            <button
+              onClick={() => setWebSearch(v => !v)}
+              className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left"
+              style={{
+                borderColor: webSearch ? 'var(--accent)' : 'var(--border)',
+                background: webSearch ? 'var(--accent-soft)' : 'var(--bg-3)',
+              }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: webSearch ? 'var(--accent-soft)' : 'var(--bg-3)', color: webSearch ? 'var(--accent)' : 'var(--text-3)' }}
+              >
+                <Globe size={17} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>Web search</span>
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{ background: webSearch ? 'var(--accent-soft)' : 'var(--bg-3)', color: webSearch ? 'var(--accent)' : 'var(--text-3)' }}
+                  >
+                    {webSearch ? 'On' : 'Off'}
+                  </span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                  Max searches DuckDuckGo and Wikipedia before answering and cites its sources. No extra API key needed.
+                </p>
+              </div>
+              <div
+                className="relative shrink-0 w-10 h-6 rounded-full transition-all duration-200"
+                style={{ background: webSearch ? '#30a46c' : 'var(--border-2)' }}
+              >
+                <div
+                  className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                  style={{ left: webSearch ? '22px' : '4px' }}
+                />
+              </div>
+            </button>
+          </div>
+        );
+
       case 'system':
         return (
           <div className="space-y-3 w-full">
@@ -340,7 +390,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             Step {step + 1} of {TOTAL}
           </p>
 
-          <div className="min-h-[300px] flex items-center justify-center">
+          <div className="min-h-[300px] max-h-[62vh] overflow-y-auto flex items-center justify-center">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
                 key={step}
