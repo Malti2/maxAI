@@ -50,6 +50,10 @@ services:
       AI_API_KEY_PRO: ${AI_API_KEY_PRO:-}
       AI_BASE_URL_BEAST: ${AI_BASE_URL_BEAST:-}
       AI_API_KEY_BEAST: ${AI_API_KEY_BEAST:-}
+      # Keyless web search (DuckDuckGo + Wikipedia, pages read through a reader)
+      WEB_SEARCH_ENABLED: ${WEB_SEARCH_ENABLED:-true}
+      WEB_SEARCH_READER_URL: ${WEB_SEARCH_READER_URL:-https://r.jina.ai/}
+      WEB_SEARCH_WIKI_LANGS: ${WEB_SEARCH_WIKI_LANGS:-de,en}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 15s
@@ -68,7 +72,9 @@ services:
     container_name: max-web
     restart: unless-stopped
     depends_on:
-      - backend
+      # Wait for a healthy backend so the first page load can't hit a 502.
+      backend:
+        condition: service_healthy
     ports:
       - "${PORT:-80}:80"
     networks:
