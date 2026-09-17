@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   if (!sidebarOpen) {
     return (
       <div
-        className="flex flex-col items-center py-4 gap-2 w-14 h-full shrink-0"
+        className="sidebar-shell sidebar-collapsed flex flex-col items-center py-4 gap-2 w-14 h-full shrink-0"
         style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
       >
         <button
@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   /* ── Full ── */
   return (
     <div
-      className="flex flex-col w-[272px] h-full shrink-0 animate-slide-left"
+      className="sidebar-shell sidebar-expanded flex flex-col w-[272px] h-full shrink-0 animate-slide-left"
       style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)' }}
     >
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">

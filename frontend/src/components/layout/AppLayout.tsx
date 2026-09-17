@@ -18,6 +18,10 @@ export const AppLayout: React.FC = () => {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
+    if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false);
+  }, [setSidebarOpen]);
+
+  useEffect(() => {
     api.get('/chat/conversations')
       .then(({ data }) => setConversations(data))
       .catch(() => toast.error('Could not load your conversations.'));

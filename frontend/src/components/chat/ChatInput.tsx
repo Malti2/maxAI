@@ -145,11 +145,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       )}
 
       <div
-        className="relative rounded-[26px] transition-shadow"
+        className="relative rounded-2xl transition-shadow"
         style={{
           background: 'var(--surface)',
           border: `1px solid ${isStreaming && chatModeEnabled ? 'var(--accent)' : 'var(--border-2)'}`,
-          boxShadow: isHome ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
+          boxShadow: isHome ? 'var(--shadow)' : 'var(--shadow-sm)',
         }}
       >
         <TextareaAutosize
@@ -160,7 +160,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           placeholder={
             isStreaming && chatModeEnabled
               ? 'Message will be queued…'
-              : isHome ? 'Ask Max anything…' : 'Message Max…'
+              : isHome ? 'Message Max…' : 'Message Max…'
           }
           minRows={isHome ? 2 : 1}
           maxRows={12}

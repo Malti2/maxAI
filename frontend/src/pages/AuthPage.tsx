@@ -54,7 +54,7 @@ export const AuthPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="rounded-3xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
+        <div className="rounded-2xl p-6" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
           <div className="flex p-1 rounded-2xl mb-6" style={{ background: 'var(--bg-3)' }}>
             {(['login', 'register'] as Mode[]).map((m) => (
               <button
