@@ -476,3 +476,14 @@ body { min-width: 320px; }
   .bubble { font-size: 14.5px; }
   .prose-max { font-size: 14.5px; }
 }
+@media (max-width: 767px) {
+  .sidebar-collapsed { display: none; }
+  .sidebar-expanded {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(86vw, 300px);
+    box-shadow: var(--shadow-xl);
+  }
+  .home-heading h1 { font-size: 32px; }
+}
