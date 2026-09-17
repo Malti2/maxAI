@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
 import { toPublicUser } from '../lib/serialize';
@@ -26,7 +26,7 @@ function generateTokens(userId: string) {
   const accessToken = jwt.sign({ userId }, env.JWT_SECRET, {
     expiresIn: env.ACCESS_TOKEN_TTL,
   } as jwt.SignOptions);
-  const refreshToken = uuidv4();
+  const refreshToken = randomUUID();
   return { accessToken, refreshToken };
 }
 

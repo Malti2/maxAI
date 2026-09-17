@@ -163,3 +163,9 @@ nur den Docker-/Laufzeit-Build, nicht den Code).
 | Vollständige, dokumentnahe Prosa-Optik (gewählt) | Ruhiger, lesbar, eigenständig; behält alle Funktionen (Tapbacks, Replies, Chat-Mode) durch beibehaltene Anker. |
 | Warmes Creme/Terrakotta wie das Referenzbild | Zu nah am Vorbild (Copyright/Anmutung). Stattdessen kühl-neutrale Fläche mit eigener Iris-Marke — klar unterscheidbar. |
 | Deutsche Begrüßungstexte | Der Rest der App ist durchgängig Englisch; gemischte Sprachen wirken inkonsistent. Begrüßung daher englisch, aber tageszeitabhängig (Kern der Anforderung). |
+
+## September 2026 interface refresh
+
+The app now uses a quieter, text-first visual system inspired by modern assistant workspaces while retaining the maxAI and Max names. The refresh removes gradient branding and ornamental motion, moves to warm neutral surfaces, tightens the sidebar, simplifies the composer, and gives the home screen a clearer hierarchy. Existing model selection, personalities, web search, history, chat mode, settings, and admin behavior are unchanged.
+
+The same maintenance pass added CI for frontend lint/build/audit and backend build/test/audit. It also removed the runtime `uuid` dependency in favor of Node's built-in `crypto.randomUUID()` and refreshed vulnerable transitive packages.
